@@ -83,6 +83,24 @@
             display: inline-block;
             filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
         }
+
+        .radar-container {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            border-radius: 1.5rem;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .radar-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen flex items-center justify-center p-4 lg:p-6">
@@ -156,6 +174,17 @@
 
             <div id="dashboard-content" class="hidden space-y-8">
                 
+                <!-- Radar Section -->
+                <section>
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Dynamic Radar Scan</h2>
+                        <span class="text-[9px] text-indigo-400 font-bold">LIVE MRMS REFLECTIVITY</span>
+                    </div>
+                    <div class="radar-container glass-panel border border-indigo-500/20">
+                        <iframe src="https://ephrataweather.github.io/MRMS/public/" allowfullscreen></iframe>
+                    </div>
+                </section>
+
                 <!-- 24-Hour Enhanced Forecast -->
                 <section>
                     <div class="flex justify-between items-end mb-4">
@@ -226,7 +255,6 @@
     <script>
         // API Configuration
         const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; 
-      <!-- yo you can try and steal the API key, but it only works on this -->
         const DEFAULT_LAT = 40.1579;
         const DEFAULT_LNG = -76.2047;
 
