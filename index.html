@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Deep Environmental Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -11,6 +11,8 @@
             background: radial-gradient(circle at top left, #0f172a, #020617);
             overflow-x: hidden;
             font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+            /* Prevent rubber-banding on mobile */
+            overscroll-behavior-y: none; 
         }
 
         .glass-panel {
@@ -25,18 +27,26 @@
             border: 1px solid rgba(255, 255, 255, 0.04);
             transition: all 0.2s ease;
             cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .metric-card:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(99, 102, 241, 0.4);
-            transform: translateY(-2px);
+        .metric-card:active {
+            transform: scale(0.98);
+        }
+
+        @media (min-width: 1024px) {
+            .metric-card:hover {
+                background: rgba(255, 255, 255, 0.05);
+                border-color: rgba(99, 102, 241, 0.4);
+                transform: translateY(-2px);
+            }
         }
 
         .glow-text {
             text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
         }
 
+        /* Custom Scrollbar - Hidden on mobile for cleaner look, visible on desktop */
         .custom-scrollbar::-webkit-scrollbar {
             width: 5px;
             height: 5px;
@@ -49,11 +59,26 @@
             border-radius: 10px;
         }
 
+        /* Hide scrollbar for horiz scroll areas on mobile */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
         .forecast-scroll {
             display: flex;
             overflow-x: auto;
             gap: 0.75rem;
             padding-bottom: 0.75rem;
+            /* Snap scrolling for better mobile feel */
+            scroll-snap-type: x mandatory;
+        }
+        
+        .forecast-scroll > * {
+            scroll-snap-align: start;
         }
 
         .precip-indicator {
@@ -103,30 +128,31 @@
         }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen flex items-center justify-center p-4 lg:p-6">
+<body class="text-slate-100 min-h-screen flex items-start lg:items-center justify-center p-0 lg:p-6">
 
-    <div class="max-w-7xl w-full glass-panel rounded-[2.5rem] overflow-hidden flex flex-col lg:flex-row relative">
+    <div class="max-w-7xl w-full glass-panel rounded-none lg:rounded-[2.5rem] overflow-hidden flex flex-col lg:flex-row relative min-h-screen lg:min-h-0">
         
-        <!-- Sidebar -->
-        <div class="lg:w-80 p-8 border-r border-white/5 bg-white/5 flex flex-col">
-            <div class="flex items-center gap-3 mb-8">
-                <div class="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20">
-                    <i data-lucide="map-pin" class="w-6 h-6 text-white"></i>
-                </div>
-                <div>
-                    <h1 id="location-name" class="text-xl font-black tracking-tight truncate w-32">Akron, PA</h1>
-                    <p class="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">Live Telemetry</p>
+        <div class="w-full lg:w-80 p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-white/5 bg-white/5 flex flex-col z-10">
+            <div class="flex items-center justify-between lg:justify-start gap-3 mb-6 lg:mb-8">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20">
+                        <i data-lucide="map-pin" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 id="location-name" class="text-xl font-black tracking-tight truncate w-40 lg:w-32">Akron, PA</h1>
+                        <p class="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">Live Telemetry</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="relative mb-8">
+            <div class="relative mb-6 lg:mb-8">
                 <input 
                     type="text" 
                     id="city-search" 
                     placeholder="Search city..." 
-                    class="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-600"
+                    class="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-600 appearance-none"
                 >
-                <div id="search-results" class="hidden absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"></div>
+                <div id="search-results" class="hidden absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-60 overflow-y-auto"></div>
             </div>
 
             <div id="weather-summary" class="space-y-4 flex-1">
@@ -134,47 +160,45 @@
                     <div id="weather-icon-lg" class="mb-2">
                         <i data-lucide="cloud" class="w-12 h-12 text-slate-300 mx-auto"></i>
                     </div>
-                    <div id="weather-temp" class="text-5xl font-black glow-text mb-1">--°</div>
+                    <div id="weather-temp" class="text-6xl lg:text-5xl font-black glow-text mb-1">--°</div>
                     <div id="weather-desc" class="text-indigo-300 font-bold uppercase tracking-widest text-[10px]">Updating...</div>
                     <div id="weather-feels" class="text-[10px] text-slate-500 mt-1 font-bold italic uppercase">Syncing Atmospheric Data</div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                <div class="grid grid-cols-4 lg:grid-cols-2 gap-2">
+                    <div class="p-2 lg:p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
                         <i data-lucide="sunrise" class="w-4 h-4 text-orange-400 mx-auto mb-1"></i>
-                        <div id="sunrise-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Sunrise</div>
+                        <div id="sunrise-time" class="font-bold text-[10px] lg:text-[11px]">--:--</div>
+                        <div class="hidden lg:block text-[7px] uppercase text-slate-500 font-bold">Sunrise</div>
                     </div>
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                    <div class="p-2 lg:p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
                         <i data-lucide="sunset" class="w-4 h-4 text-purple-400 mx-auto mb-1"></i>
-                        <div id="sunset-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Sunset</div>
+                        <div id="sunset-time" class="font-bold text-[10px] lg:text-[11px]">--:--</div>
+                        <div class="hidden lg:block text-[7px] uppercase text-slate-500 font-bold">Sunset</div>
                     </div>
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                    <div class="p-2 lg:p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
                         <i data-lucide="moon" class="w-4 h-4 text-indigo-300 mx-auto mb-1"></i>
-                        <div id="moonrise-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Moonrise</div>
+                        <div id="moonrise-time" class="font-bold text-[10px] lg:text-[11px]">--:--</div>
+                        <div class="hidden lg:block text-[7px] uppercase text-slate-500 font-bold">Moonrise</div>
                     </div>
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                    <div class="p-2 lg:p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
                         <i data-lucide="moon-star" class="w-4 h-4 text-slate-400 mx-auto mb-1"></i>
-                        <div id="moonset-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Moonset</div>
+                        <div id="moonset-time" class="font-bold text-[10px] lg:text-[11px]">--:--</div>
+                        <div class="hidden lg:block text-[7px] uppercase text-slate-500 font-bold">Moonset</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Main Workspace -->
-        <div class="flex-1 p-8 space-y-8 h-[800px] overflow-y-auto custom-scrollbar bg-black/20">
+        <div class="flex-1 p-4 lg:p-8 space-y-6 lg:space-y-8 h-auto lg:h-[800px] overflow-y-auto custom-scrollbar bg-black/20 pb-20 lg:pb-8">
             
-            <div id="loading-overlay" class="flex flex-col items-center justify-center h-full space-y-4">
+            <div id="loading-overlay" class="flex flex-col items-center justify-center h-64 lg:h-full space-y-4">
                 <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                 <p class="text-indigo-400 font-bold tracking-widest text-[10px] animate-pulse">DECRYPTING WEATHER STREAM...</p>
             </div>
 
             <div id="dashboard-content" class="hidden space-y-8">
                 
-                <!-- Radar Section -->
                 <section>
                     <div class="flex justify-between items-end mb-4">
                         <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Dynamic Radar Scan</h2>
@@ -185,76 +209,65 @@
                     </div>
                 </section>
 
-                <!-- 24-Hour Enhanced Forecast -->
                 <section>
                     <div class="flex justify-between items-end mb-4">
                         <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">24-Hour Micro-Forecast</h2>
-                        <span class="text-[9px] text-indigo-400 font-bold">TAP FOR ANALYSIS</span>
+                        <span class="text-[9px] text-indigo-400 font-bold">SWIPE FOR ANALYSIS</span>
                     </div>
-                    <div class="forecast-scroll custom-scrollbar" id="hourly-grid">
-                        <!-- Hourly data -->
-                    </div>
+                    <div class="forecast-scroll custom-scrollbar no-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0" id="hourly-grid">
+                        </div>
                 </section>
 
-                <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
-                    <!-- Left: Metrics & Pollen (5 cols) -->
-                    <div class="xl:col-span-5 space-y-8">
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+                    <div class="xl:col-span-5 space-y-6 lg:space-y-8">
                         <section>
                             <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Core Telemetry</h2>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="weather-details-grid">
-                                <!-- Enhanced Metrics -->
-                            </div>
+                                </div>
                         </section>
 
                         <section>
                             <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Plant Allergens</h2>
                             <div class="grid grid-cols-1 gap-3" id="pollen-types-list">
-                                <!-- Pollen cards -->
-                            </div>
+                                </div>
                         </section>
                     </div>
 
-                    <!-- Right: 10 Day Projection (7 cols) -->
                     <section class="xl:col-span-7">
                         <div class="flex justify-between items-end mb-4">
                             <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">10-Day Deep Scan</h2>
-                            <span class="text-[9px] text-indigo-400 font-bold">CLICK FOR DETAILS</span>
+                            <span class="text-[9px] text-indigo-400 font-bold">TAP FOR DETAILS</span>
                         </div>
                         <div class="space-y-3" id="daily-forecast">
-                            <!-- 10-day list -->
-                        </div>
+                            </div>
                     </section>
                 </div>
 
-                <!-- AQI Section -->
                 <section class="p-6 rounded-[2rem] bg-white/5 border border-white/5">
-                    <div class="flex justify-between items-center mb-6">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-6">
                         <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Chemical Composition</h2>
-                        <div id="aqi-status-badge" class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase">AQI: --</div>
+                        <div id="aqi-status-badge" class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase inline-block text-center sm:text-left">AQI: --</div>
                     </div>
-                    <div id="pollutants-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                        <!-- Pollutants -->
-                    </div>
+                    <div id="pollutants-grid" class="grid grid-cols-3 md:grid-cols-6 gap-3 lg:gap-4">
+                        </div>
                 </section>
             </div>
         </div>
     </div>
 
-    <!-- Modal for Deep Data -->
-    <div id="detail-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-6">
-        <div class="max-w-2xl w-full glass-panel rounded-[2rem] p-8 border border-white/20 shadow-2xl relative">
-            <button onclick="closeModal()" class="absolute top-6 right-6 text-slate-400 hover:text-white">
+    <div id="detail-modal" class="fixed inset-0 z-[100] hidden items-end sm:items-center justify-center p-0 sm:p-6 transition-opacity">
+        <div class="w-full max-w-2xl glass-panel rounded-t-[2.5rem] sm:rounded-[2rem] p-6 lg:p-8 border-t sm:border border-white/20 shadow-2xl relative max-h-[85vh] sm:max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <button onclick="closeModal()" class="sticky top-0 right-0 float-right z-50 text-slate-400 hover:text-white bg-slate-900/50 rounded-full p-1 mb-4">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <div id="modal-content" class="space-y-6">
-                <!-- Dynamic content -->
-            </div>
+            <div id="modal-content" class="space-y-6 pt-2">
+                </div>
         </div>
     </div>
 
     <script>
         // API Configuration
-        const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; 
+        const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; // Insert your key here
         const DEFAULT_LAT = 40.1579;
         const DEFAULT_LNG = -76.2047;
 
@@ -396,8 +409,9 @@
             const windGust = Math.round(findValue(weather, ['wind.gust.value']));
             const windDeg = findValue(weather, ['wind.direction.degrees'], 0);
 
+            // Responsive Wind HTML: col-span-1 on mobile, 2 on others
             const windHTML = `
-                <div class="col-span-2 p-4 rounded-2xl bg-white/5 border border-indigo-500/20 metric-card flex items-center justify-between">
+                <div class="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-white/5 border border-indigo-500/20 metric-card flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <div class="wind-arrow-container" style="transform: rotate(${windDeg}deg)">
                             <i data-lucide="arrow-up" class="w-6 h-6 text-indigo-400 wind-arrow"></i>
@@ -407,7 +421,7 @@
                             <div class="text-lg font-black text-white">${windSpd} <span class="text-xs text-indigo-400 font-bold uppercase">mph</span></div>
                         </div>
                     </div>
-                    <div class="text-right border-l border-white/5 pl-6">
+                    <div class="text-right border-l border-white/5 pl-4 sm:pl-6">
                         <div class="text-[9px] font-black text-slate-500 uppercase">Gusts</div>
                         <div class="text-lg font-bold text-blue-400">${windGust} <span class="text-[10px] uppercase">mph</span></div>
                     </div>
@@ -452,16 +466,16 @@
                 const hourIsDaytime = h.isDaytime ?? true;
                 
                 return `
-                <div onclick="showHourlyDetail(${i})" class="min-w-[130px] p-4 rounded-2xl bg-white/5 border border-white/5 text-center metric-card">
+                <div onclick="showHourlyDetail(${i})" class="min-w-[130px] p-4 rounded-2xl bg-white/5 border border-white/5 text-center metric-card snap-start">
                     <div class="text-[9px] text-slate-500 font-bold mb-2">${formatTime(startTimeIso)}</div>
                     <i data-lucide="${getWeatherIcon(desc, startTimeIso, hourIsDaytime)}" class="w-5 h-5 mx-auto mb-2 text-slate-400"></i>
                     <div class="text-lg font-black mb-1">${temp}°</div>
-                    <div class="text-[8px] text-indigo-400 font-bold uppercase truncate mb-2">${desc}</div>
+                    <div class="text-[8px] text-indigo-400 font-bold uppercase truncate mb-2 max-w-[100px] mx-auto">${desc}</div>
                     <div class="space-y-1">
-                        <div class="precip-indicator px-2 py-0.5 rounded-full text-[8px] font-black">
+                        <div class="precip-indicator px-2 py-0.5 rounded-full text-[8px] font-black inline-block">
                             ${pProb}% 💧
                         </div>
-                        <div class="text-[7px] font-black text-blue-400 uppercase">${pAmt}" ${pType}</div>
+                        <div class="text-[7px] font-black text-blue-400 uppercase">${pAmt}" ${pType.substring(0,4)}</div>
                     </div>
                 </div>`;
             }).join('');
@@ -486,24 +500,24 @@
                 const desc = findValue(dayFcst, ['weatherCondition.description.text'], 'Clear');
                 
                 return `
-                <div onclick="showDailyDetail(${i})" class="p-5 rounded-2xl bg-white/5 border border-white/5 metric-card group">
+                <div onclick="showDailyDetail(${i})" class="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/5 metric-card group">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-5">
-                            <div class="w-16">
+                        <div class="flex items-center gap-3 sm:gap-5">
+                            <div class="w-12 sm:w-16">
                                 <div class="text-xs font-black ${isToday ? 'text-indigo-400' : 'text-slate-100'} uppercase">${isToday ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
                                 <div class="text-[9px] text-slate-500 font-bold">${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                             </div>
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-2 sm:gap-3">
                                 <i data-lucide="${getWeatherIcon(desc, dateIso, true)}" class="w-4 h-4 text-slate-400"></i>
-                                <div class="text-xs font-bold text-indigo-200">${desc}</div>
+                                <div class="text-[10px] sm:text-xs font-bold text-indigo-200 truncate w-20 sm:w-auto">${desc}</div>
                             </div>
                         </div>
-                        <div class="flex items-center gap-8">
-                            <div class="text-right">
+                        <div class="flex items-center gap-4 sm:gap-8">
+                            <div class="text-right hidden sm:block">
                                 <div class="text-[10px] font-black text-blue-400">${pProb}% (${pAmt}")</div>
                                 <div class="text-[9px] text-slate-500 font-bold uppercase">Precip</div>
                             </div>
-                            <div class="flex flex-col items-end min-w-[50px]">
+                            <div class="flex flex-col items-end min-w-[40px] sm:min-w-[50px]">
                                 <span class="text-sm font-black text-white">${maxT}°</span>
                                 <span class="text-[10px] font-bold text-slate-600">${minT}°</span>
                             </div>
@@ -520,9 +534,9 @@
 
             const pollGrid = document.getElementById('pollutants-grid');
             pollGrid.innerHTML = (aqi.pollutants || []).map(p => `
-                <div class="p-4 rounded-xl bg-black/30 border border-white/5 text-center">
-                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">${p.displayName || 'N/A'}</div>
-                    <div class="font-bold text-xs">${Math.round(p.concentration?.value || 0)}</div>
+                <div class="p-2 sm:p-4 rounded-xl bg-black/30 border border-white/5 text-center">
+                    <div class="text-[7px] sm:text-[8px] font-black text-slate-500 uppercase mb-1 sm:mb-2 truncate">${p.displayName || 'N/A'}</div>
+                    <div class="font-bold text-[10px] sm:text-xs">${Math.round(p.concentration?.value || 0)}</div>
                 </div>
             `).join('');
 
@@ -569,10 +583,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                     <div>
                         <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Precipitation</div>
-                        <div class="text-xl font-bold">${findValue(h, ['precipitation.probability.percent', 'precipitationProbability'])}% <span class="text-xs text-blue-400">(${pAmt}" ${pType})</span></div>
+                        <div class="text-lg sm:text-xl font-bold">${findValue(h, ['precipitation.probability.percent', 'precipitationProbability'])}% <span class="text-xs text-blue-400 block sm:inline">(${pAmt}" ${pType.substring(0,3)})</span></div>
                     </div>
                     <div class="col-span-2">
                         <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Wind Dynamics</div>
@@ -656,19 +670,19 @@
                     </div>
 
                     <div class="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between">
-                        <div class="flex items-center gap-6">
-                            <div class="wind-arrow-container w-16 h-16 bg-indigo-500/20" style="transform: rotate(${windDeg}deg)">
-                                <i data-lucide="arrow-up" class="w-8 h-8 text-indigo-400 wind-arrow"></i>
+                        <div class="flex items-center gap-4 sm:gap-6">
+                            <div class="wind-arrow-container w-12 h-12 sm:w-16 sm:h-16 bg-indigo-500/20" style="transform: rotate(${windDeg}deg)">
+                                <i data-lucide="arrow-up" class="w-6 h-6 sm:w-8 sm:h-8 text-indigo-400 wind-arrow"></i>
                             </div>
                             <div>
                                 <div class="text-[10px] font-black text-indigo-400 uppercase mb-1">Wind Conditions</div>
-                                <div class="text-2xl font-black text-white">${Math.round(findValue(day, ['wind.speed.value']))} <span class="text-xs uppercase opacity-50">mph</span></div>
-                                <div class="text-xs font-bold text-slate-500">Gusts up to ${Math.round(findValue(day, ['wind.gust.value']))} mph</div>
+                                <div class="text-xl sm:text-2xl font-black text-white">${Math.round(findValue(day, ['wind.speed.value']))} <span class="text-xs uppercase opacity-50">mph</span></div>
+                                <div class="text-[10px] sm:text-xs font-bold text-slate-500">Gusts up to ${Math.round(findValue(day, ['wind.gust.value']))} mph</div>
                             </div>
                         </div>
                         <div class="text-right">
                              <div class="text-[9px] font-black text-slate-500 uppercase mb-1">Moon Phase</div>
-                             <div class="text-xs font-bold text-indigo-300 uppercase tracking-tighter">${(moon.moonPhase || 'N/A').replace('_', ' ')}</div>
+                             <div class="text-[10px] sm:text-xs font-bold text-indigo-300 uppercase tracking-tighter">${(moon.moonPhase || 'N/A').replace('_', ' ')}</div>
                         </div>
                     </div>
 
