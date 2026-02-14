@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Environmental Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at top left, #0f172a, #020617);
+            overflow-x: hidden;
+            font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .metric-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(99, 102, 241, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .forecast-scroll {
+            display: flex;
+            overflow-x: auto;
+            gap: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .precip-indicator {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        #detail-modal {
+            backdrop-filter: blur(12px);
+            background: rgba(2, 6, 23, 0.85);
+        }
+
+        .wind-arrow-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 50%;
+            transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .wind-arrow {
+            display: inline-block;
+            filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6));
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex items-center justify-center p-4 lg:p-6">
+
+    <div class="max-w-7xl w-full glass-panel rounded-[2.5rem] overflow-hidden flex flex-col lg:flex-row relative">
+        
+        <!-- Sidebar -->
+        <div class="lg:w-80 p-8 border-r border-white/5 bg-white/5 flex flex-col">
+            <div class="flex items-center gap-3 mb-8">
+                <div class="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20">
+                    <i data-lucide="map-pin" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 id="location-name" class="text-xl font-black tracking-tight truncate w-32">Akron, PA</h1>
+                    <p class="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">Live Telemetry</p>
+                </div>
+            </div>
+
+            <div class="relative mb-8">
+                <input 
+                    type="text" 
+                    id="city-search" 
+                    placeholder="Search city..." 
+                    class="w-full bg-black/40 border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-600"
+                >
+                <div id="search-results" class="hidden absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"></div>
+            </div>
+
+            <div id="weather-summary" class="space-y-4 flex-1">
+                <div class="text-center p-6 rounded-3xl bg-gradient-to-br from-indigo-500/10 to-blue-500/10 border border-indigo-500/20">
+                    <div id="weather-icon-lg" class="mb-2">
+                        <i data-lucide="cloud" class="w-12 h-12 text-slate-300 mx-auto"></i>
+                    </div>
+                    <div id="weather-temp" class="text-5xl font-black glow-text mb-1">--°</div>
+                    <div id="weather-desc" class="text-indigo-300 font-bold uppercase tracking-widest text-[10px]">Updating...</div>
+                    <div id="weather-feels" class="text-[10px] text-slate-500 mt-1 font-bold italic uppercase">Syncing Atmospheric Data</div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                        <i data-lucide="sunrise" class="w-4 h-4 text-orange-400 mx-auto mb-1"></i>
+                        <div id="sunrise-time" class="font-bold text-[11px]">--:--</div>
+                        <div class="text-[7px] uppercase text-slate-500 font-bold">Sunrise</div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                        <i data-lucide="sunset" class="w-4 h-4 text-purple-400 mx-auto mb-1"></i>
+                        <div id="sunset-time" class="font-bold text-[11px]">--:--</div>
+                        <div class="text-[7px] uppercase text-slate-500 font-bold">Sunset</div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                        <i data-lucide="moon" class="w-4 h-4 text-indigo-300 mx-auto mb-1"></i>
+                        <div id="moonrise-time" class="font-bold text-[11px]">--:--</div>
+                        <div class="text-[7px] uppercase text-slate-500 font-bold">Moonrise</div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
+                        <i data-lucide="moon-star" class="w-4 h-4 text-slate-400 mx-auto mb-1"></i>
+                        <div id="moonset-time" class="font-bold text-[11px]">--:--</div>
+                        <div class="text-[7px] uppercase text-slate-500 font-bold">Moonset</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="flex-1 p-8 space-y-8 h-[800px] overflow-y-auto custom-scrollbar bg-black/20">
+            
+            <div id="loading-overlay" class="flex flex-col items-center justify-center h-full space-y-4">
+                <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-indigo-400 font-bold tracking-widest text-[10px] animate-pulse">DECRYPTING WEATHER STREAM...</p>
+            </div>
+
+            <div id="dashboard-content" class="hidden space-y-8">
+                
+                <!-- 24-Hour Enhanced Forecast -->
+                <section>
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">24-Hour Micro-Forecast</h2>
+                        <span class="text-[9px] text-indigo-400 font-bold">TAP FOR ANALYSIS</span>
+                    </div>
+                    <div class="forecast-scroll custom-scrollbar" id="hourly-grid">
+                        <!-- Hourly data -->
+                    </div>
+                </section>
+
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                    <!-- Left: Metrics & Pollen (5 cols) -->
+                    <div class="xl:col-span-5 space-y-8">
+                        <section>
+                            <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Core Telemetry</h2>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="weather-details-grid">
+                                <!-- Enhanced Metrics -->
+                            </div>
+                        </section>
+
+                        <section>
+                            <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Plant Allergens</h2>
+                            <div class="grid grid-cols-1 gap-3" id="pollen-types-list">
+                                <!-- Pollen cards -->
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Right: 10 Day Projection (7 cols) -->
+                    <section class="xl:col-span-7">
+                        <div class="flex justify-between items-end mb-4">
+                            <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">10-Day Deep Scan</h2>
+                            <span class="text-[9px] text-indigo-400 font-bold">CLICK FOR DETAILS</span>
+                        </div>
+                        <div class="space-y-3" id="daily-forecast">
+                            <!-- 10-day list -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- AQI Section -->
+                <section class="p-6 rounded-[2rem] bg-white/5 border border-white/5">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Chemical Composition</h2>
+                        <div id="aqi-status-badge" class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase">AQI: --</div>
+                    </div>
+                    <div id="pollutants-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                        <!-- Pollutants -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Deep Data -->
+    <div id="detail-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-6">
+        <div class="max-w-2xl w-full glass-panel rounded-[2rem] p-8 border border-white/20 shadow-2xl relative">
+            <button onclick="closeModal()" class="absolute top-6 right-6 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <div id="modal-content" class="space-y-6">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; 
+      <!-- yo you can try and steal the API key, but it only works on this -->
+        const DEFAULT_LAT = 40.1579;
+        const DEFAULT_LNG = -76.2047;
+
+        let globalWeather = {};
+        let globalHourly = [];
+        let globalDaily = [];
+        let currentSunrise = null;
+        let currentSunset = null;
+        let currentMoonrise = null;
+        let currentMoonset = null;
+
+        // Logic for Snow/Sleet Ratios
+        const calculateAccumulation = (liquidQpf, type) => {
+            const liquid = parseFloat(liquidQpf) || 0;
+            const precipType = (type || "").toUpperCase();
+            
+            if (precipType.includes("SNOW")) {
+                return (liquid * 10).toFixed(2); // 10:1 Snowfall ratio
+            } else if (precipType.includes("SLEET") || precipType.includes("ICE") || precipType.includes("FREEZING")) {
+                return (liquid * 3).toFixed(2); // 3:1 Sleet ratio
+            }
+            return liquid.toFixed(2); // 1:1 Rain ratio
+        };
+
+        const findValue = (obj, keys, defaultVal = 0) => {
+            for (let key of keys) {
+                const parts = key.split('.');
+                let current = obj;
+                for (let p of parts) { 
+                    current = (current && typeof current === 'object') ? current[p] : undefined; 
+                }
+                if (current !== undefined && current !== null) return current;
+            }
+            return defaultVal;
+        };
+
+        async function updateDashboard(lat, lng, cityName) {
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const dashboardContent = document.getElementById('dashboard-content');
+            
+            loadingOverlay.classList.remove('hidden');
+            dashboardContent.classList.add('hidden');
+            if(cityName) document.getElementById('location-name').innerText = cityName;
+
+            try {
+                const endpoints = {
+                    pollen: `https://pollen.googleapis.com/v1/forecast:lookup?location.latitude=${lat}&location.longitude=${lng}&days=1&key=${API_KEY}`,
+                    aqi: `https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`,
+                    weather: `https://weather.googleapis.com/v1/currentConditions:lookup?location.latitude=${lat}&location.longitude=${lng}&unitsSystem=IMPERIAL&key=${API_KEY}`,
+                    hourly: `https://weather.googleapis.com/v1/forecast/hours:lookup?location.latitude=${lat}&location.longitude=${lng}&unitsSystem=IMPERIAL&hours=24&key=${API_KEY}`,
+                    daily: `https://weather.googleapis.com/v1/forecast/days:lookup?location.latitude=${lat}&location.longitude=${lng}&unitsSystem=IMPERIAL&days=10&pageSize=10&key=${API_KEY}`
+                };
+
+                const [pRes, aRes, wRes, hRes, dRes] = await Promise.all([
+                    fetch(endpoints.pollen),
+                    fetch(endpoints.aqi, {
+                        method: 'POST',
+                        body: JSON.stringify({ 
+                            location: { latitude: lat, longitude: lng },
+                            extraComputations: ["DOMINANT_POLLUTANT_CONCENTRATION", "POLLUTANT_CONCENTRATION"]
+                        })
+                    }),
+                    fetch(endpoints.weather),
+                    fetch(endpoints.hourly),
+                    fetch(endpoints.daily)
+                ]);
+
+                globalWeather = await wRes.json();
+                const hourlyData = await hRes.json();
+                const dailyData = await dRes.json();
+                globalHourly = hourlyData.forecastHours || [];
+                globalDaily = dailyData.forecastDays || [];
+
+                const firstDay = globalDaily[0] || {};
+                const sunEvents = firstDay.sunEvents || globalWeather.sunEvents || {};
+                const moonEvents = firstDay.moonEvents || {};
+                
+                currentSunrise = sunEvents.sunriseTime || sunEvents.sunrise;
+                currentSunset = sunEvents.sunsetTime || sunEvents.sunset;
+                currentMoonrise = moonEvents.moonriseTimes?.[0];
+                currentMoonset = moonEvents.moonsetTimes?.[0];
+
+                renderUI(await pRes.json(), await aRes.json(), globalWeather, hourlyData, dailyData);
+            } catch (err) {
+                console.error("Dashboard error:", err);
+                loadingOverlay.innerHTML = `<p class="text-red-400 text-xs font-bold">ERROR: LINK INTERRUPTED</p>`;
+            }
+        }
+
+        function getWeatherIcon(desc, isoTime, apiIsDaytime = null) {
+            const d = (desc || "").toLowerCase();
+            let isNight = false;
+
+            if (apiIsDaytime !== null) {
+                isNight = !apiIsDaytime;
+            } else {
+                const checkTime = isoTime ? new Date(isoTime).getTime() : Date.now();
+                if (currentSunrise && currentSunset) {
+                    const sunRise = new Date(currentSunrise).getTime();
+                    const sunSet = new Date(currentSunset).getTime();
+                    isNight = (checkTime < sunRise || checkTime > sunSet);
+                } else {
+                    const hour = new Date(checkTime).getHours();
+                    isNight = hour < 6 || hour > 19;
+                }
+            }
+
+            if (d.includes('rain') || d.includes('drizzle')) return 'cloud-rain';
+            if (d.includes('thunder')) return 'cloud-lightning';
+            if (d.includes('snow') || d.includes('ice') || d.includes('flurries')) return 'cloud-snow';
+            if (d.includes('cloud') || d.includes('overcast')) return 'cloud';
+            if (d.includes('fog') || d.includes('mist')) return 'cloud-fog';
+            if (d.includes('sun') || d.includes('clear')) {
+                return isNight ? 'moon' : 'sun';
+            }
+            return isNight ? 'moon' : 'sun';
+        }
+
+        function renderUI(pollen, aqi, weather, hourly, daily) {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('dashboard-content').classList.remove('hidden');
+
+            const currentDesc = findValue(weather, ['weatherCondition.description.text'], "Clear");
+            const isDaytime = weather.isDaytime ?? true;
+            document.getElementById('weather-temp').innerText = `${Math.round(findValue(weather, ['temperature.degrees']))}°`;
+            document.getElementById('weather-desc').innerText = currentDesc;
+            document.getElementById('weather-feels').innerText = `Perceived: ${Math.round(findValue(weather, ['feelsLikeTemperature.degrees']))}°`;
+            
+            document.getElementById('weather-icon-lg').innerHTML = `<i data-lucide="${getWeatherIcon(currentDesc, null, isDaytime)}" class="w-12 h-12 text-slate-300 mx-auto"></i>`;
+
+            const mb = findValue(weather, ['airPressure.meanSeaLevelMillibars'], 0);
+            const inHg = mb > 0 ? (mb * 0.02953).toFixed(2) : "0.00";
+            
+            const visDist = findValue(weather, ['visibility.distance'], 0);
+            const visUnit = findValue(weather, ['visibility.unit'], 'KILOMETERS');
+            const visMiles = visUnit === 'KILOMETERS' ? (visDist * 0.621371).toFixed(1) : visDist;
+
+            const windSpd = Math.round(findValue(weather, ['wind.speed.value']));
+            const windGust = Math.round(findValue(weather, ['wind.gust.value']));
+            const windDeg = findValue(weather, ['wind.direction.degrees'], 0);
+
+            const windHTML = `
+                <div class="col-span-2 p-4 rounded-2xl bg-white/5 border border-indigo-500/20 metric-card flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="wind-arrow-container" style="transform: rotate(${windDeg}deg)">
+                            <i data-lucide="arrow-up" class="w-6 h-6 text-indigo-400 wind-arrow"></i>
+                        </div>
+                        <div>
+                            <div class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Wind Activity</div>
+                            <div class="text-lg font-black text-white">${windSpd} <span class="text-xs text-indigo-400 font-bold uppercase">mph</span></div>
+                        </div>
+                    </div>
+                    <div class="text-right border-l border-white/5 pl-6">
+                        <div class="text-[9px] font-black text-slate-500 uppercase">Gusts</div>
+                        <div class="text-lg font-bold text-blue-400">${windGust} <span class="text-[10px] uppercase">mph</span></div>
+                    </div>
+                </div>
+            `;
+
+            const metrics = [
+                { label: 'Humidity', val: `${findValue(weather, ['relativeHumidity'])}%`, icon: 'droplets', color: 'text-blue-400' },
+                { label: 'Barometer', val: mb > 0 ? `${inHg} in` : 'N/A', icon: 'gauge', color: 'text-indigo-400' },
+                { label: 'Visibility', val: visDist > 0 ? `${visMiles} mi` : 'Unrestricted', icon: 'eye', color: 'text-emerald-400' },
+                { label: 'UV Index', val: findValue(weather, ['uvIndex']), icon: 'sun', color: 'text-yellow-400' }
+            ];
+
+            document.getElementById('weather-details-grid').innerHTML = windHTML + metrics.map(m => `
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
+                    <i data-lucide="${m.icon}" class="w-4 h-4 ${m.color}"></i>
+                    <div>
+                        <div class="text-[9px] font-black text-slate-500 uppercase">${m.label}</div>
+                        <div class="text-sm font-bold text-white">${m.val}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('sunrise-time').innerText = formatTime(currentSunrise);
+            document.getElementById('sunset-time').innerText = formatTime(currentSunset);
+            document.getElementById('moonrise-time').innerText = formatTime(currentMoonrise);
+            document.getElementById('moonset-time').innerText = formatTime(currentMoonset);
+
+            // HOURLY FORECAST
+            const hourlyGrid = document.getElementById('hourly-grid');
+            hourlyGrid.innerHTML = globalHourly.map((h, i) => {
+                const pProb = findValue(h, ['precipitation.probability.percent', 'precipitationProbability']);
+                const liquidQpf = findValue(h, ['precipitation.qpf.quantity', 'precipitation.amount.value', 'precipitationAmount'], 0);
+                const pType = findValue(h, ['precipitation.probability.type', 'precipitation.type', 'precipitationProbabilityType'], 'RAIN');
+                
+                // Use ratio logic
+                const pAmt = calculateAccumulation(liquidQpf, pType);
+                
+                const temp = Math.round(findValue(h, ['temperature.degrees']));
+                const startTimeIso = h.interval?.startTime;
+                const desc = findValue(h, ['weatherCondition.description.text'], 'Clear');
+                const hourIsDaytime = h.isDaytime ?? true;
+                
+                return `
+                <div onclick="showHourlyDetail(${i})" class="min-w-[130px] p-4 rounded-2xl bg-white/5 border border-white/5 text-center metric-card">
+                    <div class="text-[9px] text-slate-500 font-bold mb-2">${formatTime(startTimeIso)}</div>
+                    <i data-lucide="${getWeatherIcon(desc, startTimeIso, hourIsDaytime)}" class="w-5 h-5 mx-auto mb-2 text-slate-400"></i>
+                    <div class="text-lg font-black mb-1">${temp}°</div>
+                    <div class="text-[8px] text-indigo-400 font-bold uppercase truncate mb-2">${desc}</div>
+                    <div class="space-y-1">
+                        <div class="precip-indicator px-2 py-0.5 rounded-full text-[8px] font-black">
+                            ${pProb}% 💧
+                        </div>
+                        <div class="text-[7px] font-black text-blue-400 uppercase">${pAmt}" ${pType}</div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // 10-DAY PROJECTION
+            const dailyGrid = document.getElementById('daily-forecast');
+            dailyGrid.innerHTML = globalDaily.map((d, i) => {
+                const dateIso = d.interval?.startTime;
+                const date = dateIso ? new Date(dateIso) : new Date();
+                const isToday = i === 0;
+                
+                const dayFcst = d.daytimeForecast || {};
+                const pProb = findValue(dayFcst, ['precipitation.probability.percent', 'precipitationProbability']);
+                const liquidQpf = findValue(dayFcst, ['precipitation.qpf.quantity', 'precipitation.amount.value', 'precipitationAmount'], 0);
+                const pType = findValue(dayFcst, ['precipitation.probability.type', 'precipitation.type', 'precipitationProbabilityType'], 'RAIN');
+                
+                // Use ratio logic
+                const pAmt = calculateAccumulation(liquidQpf, pType);
+
+                const maxT = Math.round(findValue(d, ['maxTemperature.degrees']));
+                const minT = Math.round(findValue(d, ['minTemperature.degrees']));
+                const desc = findValue(dayFcst, ['weatherCondition.description.text'], 'Clear');
+                
+                return `
+                <div onclick="showDailyDetail(${i})" class="p-5 rounded-2xl bg-white/5 border border-white/5 metric-card group">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-5">
+                            <div class="w-16">
+                                <div class="text-xs font-black ${isToday ? 'text-indigo-400' : 'text-slate-100'} uppercase">${isToday ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                                <div class="text-[9px] text-slate-500 font-bold">${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="${getWeatherIcon(desc, dateIso, true)}" class="w-4 h-4 text-slate-400"></i>
+                                <div class="text-xs font-bold text-indigo-200">${desc}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-8">
+                            <div class="text-right">
+                                <div class="text-[10px] font-black text-blue-400">${pProb}% (${pAmt}")</div>
+                                <div class="text-[9px] text-slate-500 font-bold uppercase">Precip</div>
+                            </div>
+                            <div class="flex flex-col items-end min-w-[50px]">
+                                <span class="text-sm font-black text-white">${maxT}°</span>
+                                <span class="text-[10px] font-bold text-slate-600">${minT}°</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // AQI & POLLEN
+            const mainIndex = aqi.indexes?.find(i => i.code === 'uaqi') || aqi.indexes?.[0];
+            const badge = document.getElementById('aqi-status-badge');
+            badge.innerText = `AQI: ${mainIndex?.aqi || '--'} (${mainIndex?.category || 'N/A'})`;
+            badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${getAqiColor(mainIndex?.category)}`;
+
+            const pollGrid = document.getElementById('pollutants-grid');
+            pollGrid.innerHTML = (aqi.pollutants || []).map(p => `
+                <div class="p-4 rounded-xl bg-black/30 border border-white/5 text-center">
+                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">${p.displayName || 'N/A'}</div>
+                    <div class="font-bold text-xs">${Math.round(p.concentration?.value || 0)}</div>
+                </div>
+            `).join('');
+
+            const pollenList = document.getElementById('pollen-types-list');
+            const pollenData = pollen.dailyInfo?.[0]?.pollenTypeInfo || pollen.pollenTypeInfo || [];
+            pollenList.innerHTML = pollenData.length ? pollenData.map(t => `
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card">
+                    <div class="flex justify-between text-[10px] font-black uppercase mb-2">
+                        <span>${t.displayName}</span>
+                        <span class="text-indigo-400">${t.indexInfo?.value || 0}/5</span>
+                    </div>
+                    <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        <div class="bg-indigo-500 h-full transition-all duration-1000" style="width: ${((t.indexInfo?.value || 0)/5)*100}%"></div>
+                    </div>
+                </div>
+            `).join('') : '<div class="p-4 text-xs text-slate-500 text-center italic">No local pollen data.</div>';
+
+            lucide.createIcons();
+        }
+
+        function showHourlyDetail(index) {
+            const h = globalHourly[index];
+            if (!h) return;
+            
+            const timeIso = h.interval.startTime;
+            const time = formatTime(timeIso);
+            
+            const liquidQpf = findValue(h, ['precipitation.qpf.quantity', 'precipitation.amount.value', 'precipitationAmount'], 0);
+            const pType = findValue(h, ['precipitation.probability.type', 'precipitation.type', 'precipitationProbabilityType'], 'RAIN');
+            const pAmt = calculateAccumulation(liquidQpf, pType);
+
+            const desc = findValue(h, ['weatherCondition.description.text']);
+            const temp = Math.round(findValue(h, ['temperature.degrees']));
+            const windDeg = findValue(h, ['wind.direction.degrees'], 0);
+            const isDaytime = h.isDaytime ?? true;
+            
+            const content = `
+                <div class="border-b border-white/10 pb-4">
+                    <div class="flex items-center gap-4 mb-2">
+                        <i data-lucide="${getWeatherIcon(desc, timeIso, isDaytime)}" class="w-10 h-10 text-indigo-400"></i>
+                        <div>
+                            <h3 class="text-2xl font-black text-white">${time} Detail</h3>
+                            <p class="text-indigo-400 font-bold uppercase tracking-widest text-[10px]">${desc} | ${temp}°</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    <div>
+                        <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Precipitation</div>
+                        <div class="text-xl font-bold">${findValue(h, ['precipitation.probability.percent', 'precipitationProbability'])}% <span class="text-xs text-blue-400">(${pAmt}" ${pType})</span></div>
+                    </div>
+                    <div class="col-span-2">
+                        <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Wind Dynamics</div>
+                        <div class="flex items-center gap-4">
+                            <div class="wind-arrow-container" style="transform: rotate(${windDeg}deg)">
+                                <i data-lucide="arrow-up" class="w-6 h-6 text-indigo-400 wind-arrow"></i>
+                            </div>
+                            <div>
+                                <div class="text-xl font-bold">${Math.round(findValue(h, ['wind.speed.value']))} mph</div>
+                                <div class="text-[10px] text-slate-500 uppercase font-bold">Gusts: ${Math.round(findValue(h, ['wind.gust.value']))} mph</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Feels Like</div>
+                        <div class="text-xl font-bold">${Math.round(findValue(h, ['feelsLikeTemperature.degrees']))}°</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] font-black text-slate-500 uppercase mb-1">UV Index</div>
+                        <div class="text-xl font-bold">${findValue(h, ['uvIndex'])}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] font-black text-slate-500 uppercase mb-1">Humidity</div>
+                        <div class="text-xl font-bold">${findValue(h, ['relativeHumidity'])}%</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-content').innerHTML = content;
+            const modal = document.getElementById('detail-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function showDailyDetail(index) {
+            const d = globalDaily[index];
+            if (!d) return;
+
+            const dateIso = d.interval.startTime;
+            const date = new Date(dateIso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const day = d.daytimeForecast || {};
+            const sun = d.sunEvents || {};
+            const moon = d.moonEvents || {};
+            const desc = findValue(day, ['weatherCondition.description.text'], 'Clear');
+            const maxT = Math.round(findValue(d, ['maxTemperature.degrees']));
+            const minT = Math.round(findValue(d, ['minTemperature.degrees']));
+            const windDeg = findValue(day, ['wind.direction.degrees'], 0);
+            
+            const liquidQpf = findValue(day, ['precipitation.qpf.quantity', 'precipitation.amount.value', 'precipitationAmount'], 0);
+            const pType = findValue(day, ['precipitation.probability.type', 'precipitation.type', 'precipitationProbabilityType'], 'RAIN');
+            const pAmt = calculateAccumulation(liquidQpf, pType);
+            
+            const content = `
+                <div class="border-b border-white/10 pb-4">
+                    <div class="flex items-center gap-4 mb-2">
+                        <i data-lucide="${getWeatherIcon(desc, dateIso, true)}" class="w-10 h-10 text-indigo-400"></i>
+                        <div>
+                            <h3 class="text-2xl font-black text-white">${date}</h3>
+                            <p class="text-indigo-400 font-bold uppercase tracking-widest text-[10px]">High: ${maxT}° | Low: ${minT}° | ${desc}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="p-3 bg-white/5 rounded-xl text-center border border-white/5">
+                            <div class="text-[8px] font-black text-slate-500 uppercase mb-1">Sunrise</div>
+                            <div class="text-sm font-bold text-white">${formatTime(sun.sunriseTime)}</div>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl text-center border border-white/5">
+                            <div class="text-[8px] font-black text-slate-500 uppercase mb-1">Sunset</div>
+                            <div class="text-sm font-bold text-white">${formatTime(sun.sunsetTime)}</div>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl text-center border border-white/5">
+                            <i data-lucide="moon" class="w-3 h-3 text-indigo-300 mx-auto mb-1"></i>
+                            <div class="text-sm font-bold">${formatTime(moon.moonriseTimes?.[0])}</div>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl text-center border border-white/5">
+                            <i data-lucide="moon-star" class="w-3 h-3 text-slate-400 mx-auto mb-1"></i>
+                            <div class="text-sm font-bold">${formatTime(moon.moonsetTimes?.[0])}</div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between">
+                        <div class="flex items-center gap-6">
+                            <div class="wind-arrow-container w-16 h-16 bg-indigo-500/20" style="transform: rotate(${windDeg}deg)">
+                                <i data-lucide="arrow-up" class="w-8 h-8 text-indigo-400 wind-arrow"></i>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-black text-indigo-400 uppercase mb-1">Wind Conditions</div>
+                                <div class="text-2xl font-black text-white">${Math.round(findValue(day, ['wind.speed.value']))} <span class="text-xs uppercase opacity-50">mph</span></div>
+                                <div class="text-xs font-bold text-slate-500">Gusts up to ${Math.round(findValue(day, ['wind.gust.value']))} mph</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                             <div class="text-[9px] font-black text-slate-500 uppercase mb-1">Moon Phase</div>
+                             <div class="text-xs font-bold text-indigo-300 uppercase tracking-tighter">${(moon.moonPhase || 'N/A').replace('_', ' ')}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <div class="text-[9px] font-black text-slate-500 uppercase mb-3 tracking-widest">Hydrological Scan</div>
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <div class="text-2xl font-black text-blue-400">${findValue(day, ['precipitation.probability.percent', 'precipitationProbability'])}%</div>
+                                    <div class="text-[10px] text-slate-500 font-bold uppercase">Probability</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-black text-white">${pAmt}"</div>
+                                    <div class="text-[10px] text-slate-500 font-bold uppercase">Accumulation (${pType})</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
+                            <div class="text-[9px] font-black text-slate-500 uppercase mb-3 tracking-widest">Atmospheric Safety</div>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-slate-400 font-bold">UV Exposure</span>
+                                    <span class="text-xs font-black text-yellow-400">${findValue(day, ['uvIndex'])}</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs text-slate-400 font-bold">Relative Humidity</span>
+                                    <span class="text-xs font-black text-white">${findValue(day, ['relativeHumidity'])}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-content').innerHTML = content;
+            const modal = document.getElementById('detail-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('detail-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function formatTime(isoStr) {
+            if(!isoStr) return "--:--";
+            try {
+                const d = new Date(isoStr);
+                return isNaN(d.getTime()) ? isoStr : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            } catch(e) { return "--:--"; }
+        }
+
+        function getAqiColor(cat) {
+            if(!cat) return "bg-slate-500/20 text-slate-400";
+            cat = cat.toLowerCase();
+            if(cat.includes('good')) return "bg-emerald-500/20 text-emerald-400";
+            if(cat.includes('moderate')) return "bg-yellow-500/20 text-yellow-400";
+            return "bg-red-500/20 text-red-400";
+        }
+
+        const searchInput = document.getElementById('city-search');
+        const resultsBox = document.getElementById('search-results');
+        let searchDebounce;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchDebounce);
+            const query = e.target.value;
+            if (query.length < 3) { resultsBox.classList.add('hidden'); return; }
+
+            searchDebounce = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+                    const data = await res.json();
+                    resultsBox.innerHTML = '';
+                    if (data.features.length > 0) {
+                        data.features.forEach(f => {
+                            const div = document.createElement('div');
+                            div.className = 'p-4 hover:bg-white/10 cursor-pointer border-b border-white/5 text-xs';
+                            div.innerHTML = `<div class="font-black">${f.properties.name}</div><div class="text-[9px] opacity-50 uppercase">${f.properties.state || ''}, ${f.properties.country || ''}</div>`;
+                            div.onclick = () => {
+                                updateDashboard(f.geometry.coordinates[1], f.geometry.coordinates[0], f.properties.name);
+                                resultsBox.classList.add('hidden');
+                                searchInput.value = '';
+                            };
+                            resultsBox.appendChild(div);
+                        });
+                        resultsBox.classList.remove('hidden');
+                    }
+                } catch(e) {}
+            }, 300);
+        });
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('detail-modal');
+            if (event.target == modal) closeModal();
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            updateDashboard(DEFAULT_LAT, DEFAULT_LNG);
+        };
+    </script>
+</body>
+</html>
