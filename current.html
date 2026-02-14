@@ -15,8 +15,7 @@
         .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         .forecast-scroll { display: flex; overflow-x: auto; gap: 0.75rem; padding-bottom: 0.75rem; }
-        .precip-indicator { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); }
-        .wind-arrow-container { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: rgba(99, 102, 241, 0.15); border: 2px solid rgba(99, 102, 241, 0.3); border-radius: 50%; }
+        .wind-arrow-container { display: flex; align-items: center; justify-content: center; background: rgba(99, 102, 241, 0.15); border: 2px solid rgba(99, 102, 241, 0.3); border-radius: 50%; transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
         #detail-modal { backdrop-filter: blur(12px); background: rgba(2, 6, 23, 0.85); }
     </style>
 </head>
@@ -63,7 +62,7 @@
                         <div class="text-[7px] uppercase text-slate-500 font-bold">Moonset</div>
                     </div>
                     <div class="col-span-2 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-center">
-                        <div class="text-[7px] uppercase text-indigo-400 font-bold mb-1">Current Moon Phase</div>
+                        <div class="text-[7px] uppercase text-indigo-400 font-bold mb-1">Moon Phase</div>
                         <div id="moon-phase" class="text-[10px] font-black uppercase">--</div>
                     </div>
                 </div>
@@ -77,7 +76,7 @@
         </div>
 
         <section>
-            <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">24-Hour Micro-Forecast <span class="text-indigo-400 text-[9px] ml-2">TAP FOR ANALYSIS</span></h2>
+            <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">24-Hour Micro-Forecast <span class="text-indigo-400 text-[9px] ml-2 tracking-widest">TAP FOR ANALYSIS</span></h2>
             <div class="forecast-scroll custom-scrollbar" id="hourly-grid"></div>
         </section>
 
@@ -108,6 +107,24 @@
         const LAT = 40.1579; const LNG = -76.2047;
         let globalHourly = [];
 
+        const calculateAccumulation = (liquidQpf, type) => {
+            const liquid = parseFloat(liquidQpf) || 0;
+            const pType = (type || "").toUpperCase();
+            if (pType.includes("SNOW")) return (liquid * 10).toFixed(2);
+            if (pType.includes("SLEET") || pType.includes("ICE")) return (liquid * 3).toFixed(2);
+            return liquid.toFixed(2);
+        };
+
+        const findValue = (obj, keys, defaultVal = 0) => {
+            for (let key of keys) {
+                const parts = key.split('.');
+                let current = obj;
+                for (let p of parts) { current = (current && typeof current === 'object') ? current[p] : undefined; }
+                if (current !== undefined && current !== null) return current;
+            }
+            return defaultVal;
+        };
+
         async function init() {
             try {
                 const endpoints = {
@@ -120,7 +137,7 @@
 
                 const [wRes, aRes, pRes, hRes, dRes] = await Promise.all([
                     fetch(endpoints.weather),
-                    fetch(endpoints.aqi, { method: 'POST', body: JSON.stringify({ location: { latitude: LAT, longitude: LNG }, extraComputations: ["POLLUTANT_CONCENTRATION"]}) }),
+                    fetch(endpoints.aqi, { method: 'POST', body: JSON.stringify({ location: { latitude: LAT, longitude: LNG }}) }),
                     fetch(endpoints.pollen),
                     fetch(endpoints.hourly),
                     fetch(endpoints.daily)
@@ -137,43 +154,12 @@
             } catch (e) { console.error(e); }
         }
 
-        const findValue = (obj, keys, defaultVal = 0) => {
-            for (let key of keys) {
-                const parts = key.split('.');
-                let current = obj;
-                for (let p of parts) { current = (current && typeof current === 'object') ? current[p] : undefined; }
-                if (current !== undefined && current !== null) return current;
-            }
-            return defaultVal;
-        };
-
-        const calculateAccumulation = (liquidQpf, type) => {
-            const liquid = parseFloat(liquidQpf) || 0;
-            const precipType = (type || "").toUpperCase();
-            if (precipType.includes("SNOW")) return (liquid * 10).toFixed(2);
-            if (precipType.includes("SLEET") || precipType.includes("ICE")) return (liquid * 3).toFixed(2);
-            return liquid.toFixed(2);
-        };
-
-        function getWeatherIcon(desc, isoTime, isDaytime = true) {
-            const d = (desc || "").toLowerCase();
-            if (d.includes('rain') || d.includes('drizzle')) return 'cloud-rain';
-            if (d.includes('thunder')) return 'cloud-lightning';
-            if (d.includes('snow') || d.includes('ice')) return 'cloud-snow';
-            if (d.includes('cloud') || d.includes('overcast')) return 'cloud';
-            if (d.includes('fog') || d.includes('mist')) return 'cloud-fog';
-            return isDaytime ? 'sun' : 'moon';
-        }
-
         function render(w, a, p, h, d) {
             const desc = findValue(w, ['weatherCondition.description.text'], "Clear");
-            const isDay = w.isDaytime ?? true;
             document.getElementById('weather-temp').innerText = `${Math.round(w.temperature.degrees)}°`;
             document.getElementById('weather-desc').innerText = desc;
             document.getElementById('weather-feels').innerText = `Perceived: ${Math.round(w.feelsLikeTemperature.degrees)}°`;
-            document.getElementById('weather-icon-lg').innerHTML = `<i data-lucide="${getWeatherIcon(desc, null, isDay)}" class="w-12 h-12 text-slate-300"></i>`;
-
-            // Solar/Lunar
+            
             const sun = d.sunEvents || {};
             const moon = d.moonEvents || {};
             document.getElementById('sunrise-time').innerText = formatTime(sun.sunriseTime);
@@ -182,55 +168,62 @@
             document.getElementById('moonset-time').innerText = formatTime(moon.moonsetTimes?.[0]);
             document.getElementById('moon-phase').innerText = (moon.moonPhase || 'N/A').replace(/_/g, ' ');
 
-            // Core Metrics
             const mb = findValue(w, ['airPressure.meanSeaLevelMillibars'], 0);
             const inHg = (mb * 0.02953).toFixed(2);
             const visMiles = (findValue(w, ['visibility.distance']) * 0.621).toFixed(1);
+            const windDeg = findValue(w, ['wind.direction.degrees'], 0);
             
-            const metrics = [
-                { label: 'Wind/Gusts', val: `${Math.round(w.wind.speed.value)} / ${Math.round(w.wind.gust.value)} mph`, icon: 'wind', color: 'text-indigo-400' },
-                { label: 'Humidity', val: `${w.relativeHumidity}%`, icon: 'droplets', color: 'text-blue-400' },
-                { label: 'Pressure', val: `${inHg} in`, icon: 'gauge', color: 'text-emerald-400' },
-                { label: 'Visibility', val: `${visMiles} mi`, icon: 'eye', color: 'text-slate-400' },
-                { label: 'UV Index', val: w.uvIndex, icon: 'sun', color: 'text-yellow-400' }
-            ];
-            document.getElementById('weather-details-grid').innerHTML = metrics.map(m => `
+            // Core Metrics with Wind Arrow
+            document.getElementById('weather-details-grid').innerHTML = `
+                <div class="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 metric-card flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="wind-arrow-container w-11 h-11" style="transform: rotate(${windDeg}deg)"><i data-lucide="arrow-up" class="w-5 h-5 text-indigo-400"></i></div>
+                        <div><div class="text-[9px] font-black text-slate-500 uppercase">Wind / Gusts</div><div class="text-sm font-bold">${Math.round(w.wind.speed.value)} / ${Math.round(w.wind.gust.value)} mph</div></div>
+                    </div>
+                </div>
                 <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
-                    <i data-lucide="${m.icon}" class="w-4 h-4 ${m.color}"></i>
-                    <div><div class="text-[9px] font-black text-slate-500 uppercase">${m.label}</div><div class="text-sm font-bold text-white">${m.val}</div></div>
-                </div>`).join('');
+                    <i data-lucide="droplets" class="w-4 h-4 text-blue-400"></i>
+                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Humidity</div><div class="text-sm font-bold">${w.relativeHumidity}%</div></div>
+                </div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
+                    <i data-lucide="gauge" class="w-4 h-4 text-emerald-400"></i>
+                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Pressure</div><div class="text-sm font-bold">${inHg} in</div></div>
+                </div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
+                    <i data-lucide="eye" class="w-4 h-4 text-slate-400"></i>
+                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Visibility</div><div class="text-sm font-bold">${visMiles} mi</div></div>
+                </div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
+                    <i data-lucide="sun" class="w-4 h-4 text-yellow-400"></i>
+                    <div><div class="text-[9px] font-black text-slate-500 uppercase">UV Index</div><div class="text-sm font-bold">${w.uvIndex}</div></div>
+                </div>`;
 
             // Hourly
-            document.getElementById('hourly-grid').innerHTML = globalHourly.map((hour, i) => {
-                const hDesc = findValue(hour, ['weatherCondition.description.text']);
-                return `
+            document.getElementById('hourly-grid').innerHTML = globalHourly.map((hour, i) => `
                 <div onclick="showHourlyDetail(${i})" class="min-w-[130px] p-4 rounded-2xl bg-white/5 border border-white/5 text-center metric-card">
                     <div class="text-[9px] text-slate-500 font-bold mb-2">${formatTime(hour.interval.startTime)}</div>
-                    <i data-lucide="${getWeatherIcon(hDesc, null, hour.isDaytime)}" class="w-5 h-5 mx-auto mb-2 text-slate-400"></i>
                     <div class="text-lg font-black mb-1">${Math.round(hour.temperature.degrees)}°</div>
-                    <div class="text-[8px] text-indigo-400 font-bold uppercase truncate mb-2">${hDesc}</div>
-                    <div class="precip-indicator px-2 py-0.5 rounded-full text-[8px] font-black inline-block">${hour.precipitationProbability || 0}% 💧</div>
-                </div>`;
-            }).join('');
+                    <div class="text-[8px] text-indigo-400 font-bold uppercase truncate mb-2">${findValue(hour, ['weatherCondition.description.text'])}</div>
+                    <div class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full text-[8px] font-black inline-block">${hour.precipitationProbability || 0}% 💧</div>
+                </div>`).join('');
 
-            // AQI (US EPA)
+            // AQI & Pollen
             const aqiIdx = a.indexes.find(i => i.code === 'usa_epa') || a.indexes[0];
             const badge = document.getElementById('aqi-status-badge');
             badge.innerText = `AQI: ${aqiIdx.aqi} (${aqiIdx.category})`;
             badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${aqiIdx.category.toLowerCase().includes('good') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`;
-
+            
             document.getElementById('pollutants-grid').innerHTML = (a.pollutants || []).map(p => `
                 <div class="p-4 rounded-xl bg-black/30 border border-white/5 text-center">
                     <div class="text-[8px] font-black text-slate-500 uppercase mb-2">${p.displayName}</div>
                     <div class="font-bold text-xs">${Math.round(p.concentration.value)}</div>
                 </div>`).join('');
 
-            // Pollen
-            const pData = p.dailyInfo[0].pollenTypeInfo || [];
-            document.getElementById('pollen-types-list').innerHTML = pData.map(t => `
-                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card">
+            const pollenData = p.dailyInfo?.[0]?.pollenTypeInfo || [];
+            document.getElementById('pollen-types-list').innerHTML = pollenData.map(t => `
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
                     <div class="flex justify-between text-[10px] font-black uppercase mb-2"><span>${t.displayName}</span><span class="text-indigo-400">${t.indexInfo.value}/5</span></div>
-                    <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden"><div class="bg-indigo-500 h-full" style="width: ${(t.indexInfo.value/5)*100}%"></div></div>
+                    <div class="w-full bg-white/10 h-1 rounded-full"><div class="bg-indigo-500 h-full" style="width: ${(t.indexInfo.value/5)*100}%"></div></div>
                 </div>`).join('');
 
             lucide.createIcons();
@@ -238,18 +231,18 @@
 
         function showHourlyDetail(index) {
             const h = globalHourly[index];
-            const time = formatTime(h.interval.startTime);
-            const desc = findValue(h, ['weatherCondition.description.text']);
             const pAmt = calculateAccumulation(findValue(h, ['precipitationAmount']), findValue(h, ['precipitationProbabilityType']));
-            
             document.getElementById('modal-content').innerHTML = `
-                <div class="flex items-center gap-4 border-b border-white/10 pb-4">
-                    <i data-lucide="${getWeatherIcon(desc, null, h.isDaytime)}" class="w-10 h-10 text-indigo-400"></i>
-                    <div><h3 class="text-2xl font-black text-white">${time} Detail</h3><p class="text-indigo-400 font-bold uppercase text-[10px]">${desc} | ${Math.round(h.temperature.degrees)}°</p></div>
-                </div>
+                <h3 class="text-2xl font-black text-white">${formatTime(h.interval.startTime)} Analysis</h3>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    <div><div class="text-[10px] font-black text-slate-500 uppercase">Precipitation</div><div class="text-xl font-bold">${h.precipitationProbability}% <span class="text-xs text-blue-400">(${pAmt}")</span></div></div>
-                    <div><div class="text-[10px] font-black text-slate-500 uppercase">Wind / Gust</div><div class="text-xl font-bold">${Math.round(h.wind.speed.value)} / ${Math.round(h.wind.gust.value)} <span class="text-xs">mph</span></div></div>
+                    <div><div class="text-[10px] font-black text-slate-500 uppercase">Precipitation</div><div class="text-xl font-bold">${h.precipitationProbability}% (${pAmt}")</div></div>
+                    <div class="col-span-2">
+                        <div class="text-[10px] font-black text-slate-500 uppercase mb-2">Wind Dynamics</div>
+                        <div class="flex items-center gap-4">
+                            <div class="wind-arrow-container w-14 h-14" style="transform: rotate(${findValue(h, ['wind.direction.degrees'])}deg)"><i data-lucide="arrow-up" class="w-6 h-6 text-indigo-400"></i></div>
+                            <div><div class="text-xl font-bold">${Math.round(h.wind.speed.value)} mph</div><div class="text-[10px] text-slate-500 font-bold uppercase">Gusts: ${Math.round(h.wind.gust.value)}</div></div>
+                        </div>
+                    </div>
                     <div><div class="text-[10px] font-black text-slate-500 uppercase">Feels Like</div><div class="text-xl font-bold">${Math.round(h.feelsLikeTemperature.degrees)}°</div></div>
                     <div><div class="text-[10px] font-black text-slate-500 uppercase">Humidity</div><div class="text-xl font-bold">${h.relativeHumidity}%</div></div>
                     <div><div class="text-[10px] font-black text-slate-500 uppercase">UV Index</div><div class="text-xl font-bold">${h.uvIndex}</div></div>
@@ -260,8 +253,7 @@
 
         function closeModal() { document.getElementById('detail-modal').classList.replace('flex', 'hidden'); }
         function formatTime(iso) { return iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : "--:--"; }
-        
-        window.onload = init;
+        init();
     </script>
 </body>
 </html>
