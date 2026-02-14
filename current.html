@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Current Telemetry</title>
+    <title>Current Telemetry & Alerts</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -24,6 +24,11 @@
         #detail-modal { backdrop-filter: blur(12px); background: rgba(2, 6, 23, 0.85); }
         .wind-arrow-container { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: rgba(99, 102, 241, 0.15); border: 2px solid rgba(99, 102, 241, 0.3); border-radius: 50%; transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
         .wind-arrow { display: inline-block; filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.6)); }
+        
+        /* Alert Specific Styles */
+        .alert-severe { border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .alert-moderate { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.1); }
+        .alert-minor { border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.1); }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen flex items-start lg:items-center justify-center p-0 lg:p-6">
@@ -92,6 +97,9 @@
 
             <div id="dashboard-content" class="hidden space-y-8">
                 
+                <div id="alerts-container" class="hidden space-y-4">
+                    </div>
+
                 <section>
                     <div class="flex justify-between items-end mb-4">
                         <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">24-Hour Micro-Forecast</h2>
@@ -177,18 +185,21 @@
                     pollen: `https://pollen.googleapis.com/v1/forecast:lookup?location.latitude=${lat}&location.longitude=${lng}&days=1&key=${API_KEY}`,
                     aqi: `https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`,
                     weather: `https://weather.googleapis.com/v1/currentConditions:lookup?location.latitude=${lat}&location.longitude=${lng}&unitsSystem=IMPERIAL&key=${API_KEY}`,
-                    hourly: `https://weather.googleapis.com/v1/forecast/hours:lookup?location.latitude=${lat}&location.longitude=${lng}&unitsSystem=IMPERIAL&hours=24&key=${API_KEY}`
+                    hourly: `https://weather.googleapis.com/v1/forecast/hours:lookup?location.latitude=${lat}&location.longitude=${lng}&unitsSystem=IMPERIAL&hours=24&key=${API_KEY}`,
+                    alerts: `https://weather.googleapis.com/v1/publicAlerts:lookup?location.latitude=${lat}&location.longitude=${lng}&key=${API_KEY}`
                 };
 
-                const [pRes, aRes, wRes, hRes] = await Promise.all([
+                const [pRes, aRes, wRes, hRes, alRes] = await Promise.all([
                     fetch(endpoints.pollen),
                     fetch(endpoints.aqi, { method: 'POST', body: JSON.stringify({ location: { latitude: lat, longitude: lng }, extraComputations: ["DOMINANT_POLLUTANT_CONCENTRATION", "POLLUTANT_CONCENTRATION"] }) }),
                     fetch(endpoints.weather),
-                    fetch(endpoints.hourly)
+                    fetch(endpoints.hourly),
+                    fetch(endpoints.alerts)
                 ]);
 
                 globalWeather = await wRes.json();
                 const hourlyData = await hRes.json();
+                const alertsData = await alRes.json(); // Fetch Alerts
                 globalHourly = hourlyData.forecastHours || [];
                 
                 // Fetch daily just for sun/moon times of today
@@ -203,38 +214,69 @@
                 currentMoonrise = moonEvents.moonriseTimes?.[0];
                 currentMoonset = moonEvents.moonsetTimes?.[0];
 
-                renderUI(await pRes.json(), await aRes.json(), globalWeather, hourlyData);
+                renderUI(await pRes.json(), await aRes.json(), globalWeather, hourlyData, alertsData);
             } catch (err) {
                 console.error("Dashboard error:", err);
                 loadingOverlay.innerHTML = `<p class="text-red-400 text-xs font-bold">ERROR: LINK INTERRUPTED</p>`;
             }
         }
 
-        function getWeatherIcon(desc, isoTime, apiIsDaytime = null) {
-            const d = (desc || "").toLowerCase();
-            let isNight = false;
-            if (apiIsDaytime !== null) { isNight = !apiIsDaytime; } 
-            else {
-                const checkTime = isoTime ? new Date(isoTime).getTime() : Date.now();
-                if (currentSunrise && currentSunset) {
-                    const sunRise = new Date(currentSunrise).getTime();
-                    const sunSet = new Date(currentSunset).getTime();
-                    isNight = (checkTime < sunRise || checkTime > sunSet);
-                } else { const hour = new Date(checkTime).getHours(); isNight = hour < 6 || hour > 19; }
-            }
-            if (d.includes('rain') || d.includes('drizzle')) return 'cloud-rain';
-            if (d.includes('thunder')) return 'cloud-lightning';
-            if (d.includes('snow') || d.includes('ice') || d.includes('flurries')) return 'cloud-snow';
-            if (d.includes('cloud') || d.includes('overcast')) return 'cloud';
-            if (d.includes('fog') || d.includes('mist')) return 'cloud-fog';
-            if (d.includes('sun') || d.includes('clear')) return isNight ? 'moon' : 'sun';
-            return isNight ? 'moon' : 'sun';
-        }
-
-        function renderUI(pollen, aqi, weather, hourly) {
+        function renderUI(pollen, aqi, weather, hourly, alerts) {
             document.getElementById('loading-overlay').classList.add('hidden');
             document.getElementById('dashboard-content').classList.remove('hidden');
 
+            // --- ALERT RENDERING ---
+            const alertContainer = document.getElementById('alerts-container');
+            const activeAlerts = alerts.alerts || [];
+
+            if (activeAlerts.length > 0) {
+                alertContainer.classList.remove('hidden');
+                alertContainer.innerHTML = activeAlerts.map(alert => {
+                    // Determine styling based on severity
+                    let sevClass = 'alert-minor';
+                    const s = (alert.severity || "").toUpperCase();
+                    if(s === 'EXTREME' || s === 'SEVERE') sevClass = 'alert-severe';
+                    else if(s === 'MODERATE') sevClass = 'alert-moderate';
+
+                    return `
+                    <div class="p-4 rounded-2xl bg-white/5 border border-white/5 ${sevClass} space-y-3">
+                        <div class="flex justify-between items-start gap-4">
+                            <div>
+                                <h3 class="text-sm font-black text-white uppercase tracking-wider">${alert.headline || alert.type || "Weather Alert"}</h3>
+                                <div class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                                    ${alert.severity} • ${alert.certainty} • ${alert.urgency}
+                                </div>
+                            </div>
+                            <i data-lucide="alert-triangle" class="w-5 h-5 text-white/80 shrink-0"></i>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300">
+                             <div>
+                                <p class="text-[9px] font-black text-slate-500 uppercase mb-1">Affected Areas</p>
+                                <p>${alert.areaDesc || "Regional"}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-500 uppercase mb-1">Timing</p>
+                                <p>${formatTime(alert.effective)} - ${formatTime(alert.expires)}</p>
+                            </div>
+                        </div>
+
+                        <div class="text-xs bg-black/20 p-3 rounded-lg border border-white/5">
+                            <p class="text-[9px] font-black text-indigo-400 uppercase mb-1">Instructions & Action</p>
+                            <p class="leading-relaxed opacity-90">${alert.description || alert.instruction || "No specific instructions provided."}</p>
+                        </div>
+                        
+                        <div class="text-[9px] text-right text-slate-500 font-bold uppercase">
+                            Source: ${alert.source || "Official Weather Authority"}
+                        </div>
+                    </div>`;
+                }).join('');
+            } else {
+                alertContainer.classList.add('hidden');
+                alertContainer.innerHTML = '';
+            }
+
+            // --- STANDARD RENDERING ---
             const currentDesc = findValue(weather, ['weatherCondition.description.text'], "Clear");
             const isDaytime = weather.isDaytime ?? true;
             document.getElementById('weather-temp').innerText = `${Math.round(findValue(weather, ['temperature.degrees']))}°`;
@@ -333,6 +375,27 @@
                 </div>`).join('') : '<div class="p-4 text-xs text-slate-500 text-center italic">No local pollen data.</div>';
 
             lucide.createIcons();
+        }
+
+        function getWeatherIcon(desc, isoTime, apiIsDaytime = null) {
+            const d = (desc || "").toLowerCase();
+            let isNight = false;
+            if (apiIsDaytime !== null) { isNight = !apiIsDaytime; } 
+            else {
+                const checkTime = isoTime ? new Date(isoTime).getTime() : Date.now();
+                if (currentSunrise && currentSunset) {
+                    const sunRise = new Date(currentSunrise).getTime();
+                    const sunSet = new Date(currentSunset).getTime();
+                    isNight = (checkTime < sunRise || checkTime > sunSet);
+                } else { const hour = new Date(checkTime).getHours(); isNight = hour < 6 || hour > 19; }
+            }
+            if (d.includes('rain') || d.includes('drizzle')) return 'cloud-rain';
+            if (d.includes('thunder')) return 'cloud-lightning';
+            if (d.includes('snow') || d.includes('ice') || d.includes('flurries')) return 'cloud-snow';
+            if (d.includes('cloud') || d.includes('overcast')) return 'cloud';
+            if (d.includes('fog') || d.includes('mist')) return 'cloud-fog';
+            if (d.includes('sun') || d.includes('clear')) return isNight ? 'moon' : 'sun';
+            return isNight ? 'moon' : 'sun';
         }
 
         function showHourlyDetail(index) {
