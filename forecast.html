@@ -8,132 +8,120 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body { background: #020617; color: #f1f5f9; font-family: ui-sans-serif, system-ui; }
-        .forecast-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); cursor: pointer; transition: 0.2s; }
-        .forecast-card:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(99, 102, 241, 0.4); }
-        .glass-panel { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .wind-arrow-container { display: flex; align-items: center; justify-content: center; background: rgba(99, 102, 241, 0.15); border: 2px solid rgba(99, 102, 241, 0.3); border-radius: 50%; }
-        #detail-modal { backdrop-filter: blur(12px); background: rgba(2, 6, 23, 0.85); }
+        .forecast-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); transition: 0.2s; cursor: pointer; }
+        .forecast-card:hover { background: rgba(255, 255, 255, 0.07); border-color: rgba(99, 102, 241, 0.4); transform: scale(1.005); }
+        .wind-ico { display: flex; align-items: center; justify-content: center; background: rgba(99, 102, 241, 0.15); border-radius: 50%; }
+        #detail-modal { backdrop-filter: blur(20px); background: rgba(2, 6, 23, 0.9); }
     </style>
 </head>
 <body class="p-4 lg:p-10 max-w-4xl mx-auto space-y-8">
-    <header><h1 class="text-4xl font-black tracking-tight">10-Day Deep Scan</h1><p class="text-[10px] text-indigo-400 uppercase font-bold tracking-[0.2em]">Predictive Analysis | Akron, PA</p></header>
-    <div id="daily-container" class="space-y-3"></div>
+    <header class="flex justify-between items-end">
+        <div>
+            <h1 class="text-4xl font-black tracking-tighter italic">10-DAY SCAN</h1>
+            <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.3em]">Predictive Telemetry | Akron, PA</p>
+        </div>
+        <div class="flex gap-2 text-slate-500"><i data-lucide="shield-check" class="w-4 h-4"></i><span class="text-[9px] font-black uppercase tracking-widest">Atmospheric Verified</span></div>
+    </header>
+
+    <div id="forecast-list" class="space-y-3"></div>
 
     <div id="detail-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-6">
-        <div class="max-w-2xl w-full glass-panel rounded-[2.5rem] p-8 border border-white/20 relative overflow-y-auto max-h-[90vh]">
-            <button onclick="closeModal()" class="absolute top-6 right-6 text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
-            <div id="modal-content" class="space-y-6"></div>
+        <div class="max-w-xl w-full glass-panel bg-[#0f172a]/90 rounded-[3rem] p-10 border border-white/20 relative overflow-y-auto max-h-[90vh]">
+            <button onclick="closeM()" class="absolute top-8 right-8 text-slate-400"><i data-lucide="x" class="w-8 h-8"></i></button>
+            <div id="m-body" class="space-y-8"></div>
         </div>
     </div>
 
     <script>
         const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; // Insert Key
-        const LAT = 40.1579; const LNG = -76.2047;
-        let globalDaily = [];
+        const LAT = 40.1579, LNG = -76.2047;
+        let dayData = [];
 
-        const calculateAccumulation = (liq, type) => {
-            const l = parseFloat(liq) || 0;
-            const t = (type || "").toUpperCase();
-            return t.includes("SNOW") ? (l * 10).toFixed(2) : l.toFixed(2);
-        };
-
-        const findValue = (obj, keys, def = 0) => {
-            for (let k of keys) {
-                let curr = obj;
-                for (let p of k.split('.')) curr = curr?.[p];
-                if (curr !== undefined && curr !== null) return curr;
-            }
-            return def;
-        };
-
-        async function init() {
-            try {
-                const res = await fetch(`https://weather.googleapis.com/v1/forecast/days:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&days=10&pageSize=10&key=${API_KEY}`);
-                const data = await res.json();
-                globalDaily = data.forecastDays || [];
-                render();
-            } catch(e) { console.error(e); }
+        async function getF() {
+            const r = await fetch(`https://weather.googleapis.com/v1/forecast/days:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&days=10&pageSize=10&key=${API_KEY}`);
+            const data = await r.json();
+            dayData = data.forecastDays;
+            render();
         }
 
-        function render() {
-            document.getElementById('daily-container').innerHTML = globalDaily.map((d, i) => {
-                const date = new Date(d.interval.startTime);
-                const day = d.daytimeForecast || {};
-                const prob = findValue(day, ['precipitationProbability', 'precipitation.probability.percent']);
-                const amt = calculateAccumulation(findValue(day, ['precipitationAmount', 'precipitation.amount.value']), findValue(day, ['precipitationProbabilityType', 'precipitation.type']));
+        const getIco = (d) => {
+            const s = d?.toLowerCase() || "";
+            if(s.includes('rain')) return 'cloud-drizzle';
+            if(s.includes('snow')) return 'cloud-snow';
+            if(s.includes('cloud')) return 'cloudy';
+            return 'sun';
+        };
 
+        function render() {
+            document.getElementById('forecast-list').innerHTML = dayData.map((d, i) => {
+                const dt = new Date(d.interval.startTime);
+                const day = d.daytimeForecast || {};
                 return `
-                <div onclick="showDailyDetail(${i})" class="forecast-card p-5 rounded-3xl flex items-center justify-between">
+                <div onclick="showM(${i})" class="forecast-card p-5 rounded-[2rem] flex items-center justify-between">
                     <div class="flex items-center gap-6">
                         <div class="w-16">
-                            <div class="text-xs font-black uppercase ${i === 0 ? 'text-indigo-400' : ''}">${i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                            <div class="text-[9px] text-slate-500 font-bold">${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}</div>
+                            <div class="text-xs font-black uppercase ${i===0?'text-indigo-400':''}">${i===0?'Today':dt.toLocaleDateString('en-US',{weekday:'short'})}</div>
+                            <div class="text-[9px] font-bold text-slate-500">${dt.getDate()} ${dt.toLocaleString('default',{month:'short'})}</div>
                         </div>
-                        <div>
-                            <div class="text-xs font-bold text-indigo-100">${day.weatherCondition.description.text}</div>
-                            <div class="text-[9px] font-black text-blue-400 uppercase">${prob}% Chance (${amt}")</div>
+                        <div class="flex items-center gap-4">
+                            <i data-lucide="${getIco(day.weatherCondition.description.text)}" class="w-6 h-6 text-indigo-200"></i>
+                            <div>
+                                <div class="text-[11px] font-bold text-white uppercase tracking-tighter">${day.weatherCondition.description.text}</div>
+                                <div class="flex items-center gap-2 text-[8px] font-black text-blue-400 uppercase">
+                                    <i data-lucide="droplets" class="w-2.5 h-2.5"></i> ${day.precipitationProbability || 0}% Chance
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="text-right">
-                        <div class="text-xl font-black text-white">${Math.round(d.maxTemperature.degrees)}°</div>
-                        <div class="text-[10px] font-bold text-slate-600">${Math.round(d.minTemperature.degrees)}°</div>
+                    <div class="flex items-center gap-8">
+                        <div class="hidden md:flex flex-col items-center">
+                            <div class="wind-ico w-8 h-8" style="transform: rotate(${day.wind.direction.degrees}deg)"><i data-lucide="arrow-up" class="w-3 h-3 text-indigo-400"></i></div>
+                            <span class="text-[7px] font-black mt-1 uppercase text-slate-500">${Math.round(day.wind.speed.value)} mph</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xl font-black text-white leading-none">${Math.round(d.maxTemperature.degrees)}°</div>
+                            <div class="text-[10px] font-bold text-slate-600">${Math.round(d.minTemperature.degrees)}°</div>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
             lucide.createIcons();
         }
 
-        function showDailyDetail(idx) {
-            const d = globalDaily[idx];
-            const day = d.daytimeForecast || {};
-            const sun = d.sunEvents || {};
-            const moon = d.moonEvents || {};
-            const amt = calculateAccumulation(findValue(day, ['precipitationAmount']), findValue(day, ['precipitationProbabilityType']));
-
-            document.getElementById('modal-content').innerHTML = `
-                <h3 class="text-2xl font-black text-white">${new Date(d.interval.startTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+        function showM(idx) {
+            const d = dayData[idx], day = d.daytimeForecast || {}, s = d.sunEvents, m = d.moonEvents;
+            const qpf = day.precipitationAmount ? day.precipitationAmount.value.toFixed(2) : "0.00";
+            
+            document.getElementById('m-body').innerHTML = `
+                <div>
+                    <h3 class="text-3xl font-black">${new Date(d.interval.startTime).toLocaleDateString('en-US',{weekday:'long', month:'long', day:'numeric'})}</h3>
+                    <p class="text-indigo-400 font-bold uppercase tracking-[0.2em] text-[10px]">${day.weatherCondition.description.text}</p>
+                </div>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="p-3 bg-white/5 rounded-xl text-center">
-                        <div class="text-[8px] font-black text-slate-500 uppercase">Sunrise / Set</div>
-                        <div class="text-xs font-bold">${formatTime(sun.sunriseTime)} / ${formatTime(sun.sunsetTime)}</div>
-                    </div>
-                    <div class="p-3 bg-white/5 rounded-xl text-center">
-                        <div class="text-[8px] font-black text-slate-500 uppercase">Moonrise / Set</div>
-                        <div class="text-xs font-bold">${formatTime(moon.moonriseTimes?.[0])} / ${formatTime(moon.moonsetTimes?.[0])}</div>
-                    </div>
-                    <div class="col-span-2 p-3 bg-indigo-500/10 rounded-xl text-center border border-indigo-500/20">
-                        <div class="text-[8px] font-black text-indigo-400 uppercase">Moon Phase</div>
-                        <div class="text-xs font-bold uppercase">${(moon.moonPhase || 'N/A').replace(/_/g, ' ')}</div>
-                    </div>
+                    <div class="p-4 bg-white/5 rounded-2xl text-center"><i data-lucide="sunrise" class="w-4 h-4 mx-auto mb-2 text-orange-400"></i><div class="text-xs font-bold">${new Date(s.sunriseTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>
+                    <div class="p-4 bg-white/5 rounded-2xl text-center"><i data-lucide="sunset" class="w-4 h-4 mx-auto mb-2 text-purple-400"></i><div class="text-xs font-bold">${new Date(s.sunsetTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>
+                    <div class="p-4 bg-white/5 rounded-2xl text-center"><i data-lucide="moon" class="w-4 h-4 mx-auto mb-2 text-indigo-300"></i><div class="text-xs font-bold">${m.moonriseTimes?new Date(m.moonriseTimes[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'--'}</div></div>
+                    <div class="p-4 bg-white/5 rounded-2xl text-center"><i data-lucide="moon-star" class="w-4 h-4 mx-auto mb-2 text-slate-400"></i><div class="text-xs font-bold">${m.moonsetTimes?new Date(m.moonsetTimes[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'--'}</div></div>
                 </div>
-
-                <div class="p-5 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-between">
+                <div class="p-6 bg-indigo-500/10 border border-indigo-500/20 rounded-3xl flex items-center justify-between">
                     <div class="flex items-center gap-6">
-                        <div class="wind-arrow-container w-16 h-16" style="transform: rotate(${day.wind.direction.degrees}deg)"><i data-lucide="arrow-up" class="w-8 h-8 text-indigo-400"></i></div>
-                        <div><div class="text-[10px] font-black text-slate-500 uppercase">Wind / Gusts</div><div class="text-2xl font-black">${Math.round(day.wind.speed.value)} / ${Math.round(day.wind.gust.value)} mph</div></div>
+                        <div class="wind-ico w-16 h-16" style="transform: rotate(${day.wind.direction.degrees}deg)"><i data-lucide="arrow-up" class="w-8 h-8 text-indigo-400"></i></div>
+                        <div><div class="text-[10px] font-black text-indigo-400 uppercase">Wind Velocity</div><div class="text-2xl font-black">${Math.round(day.wind.speed.value)} / ${Math.round(day.wind.gust.value)} <span class="text-xs opacity-50">mph</span></div></div>
                     </div>
+                    <div class="text-right"><div class="text-[9px] font-black text-slate-500 uppercase">Phase</div><div class="text-xs font-bold text-indigo-200">${(m.moonPhase||'N/A').replace(/_/g,' ')}</div></div>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="p-4 bg-white/5 rounded-2xl border border-white/5">
-                        <div class="text-[9px] font-black text-slate-500 uppercase mb-2">Hydrology</div>
-                        <div class="flex justify-between">
-                            <div><div class="text-2xl font-black text-blue-400">${day.precipitationProbability}%</div><div class="text-[9px] uppercase font-bold">Chance</div></div>
-                            <div class="text-right"><div class="text-2xl font-black text-white">${amt}"</div><div class="text-[9px] uppercase font-bold">Total Accu</div></div>
-                        </div>
-                    </div>
-                    <div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-2">
-                        <div class="flex justify-between"><span class="text-xs text-slate-400 font-bold uppercase">UV Index</span><span class="text-xs font-black text-yellow-400">${day.uvIndex}</span></div>
-                        <div class="flex justify-between"><span class="text-xs text-slate-400 font-bold uppercase">Humidity</span><span class="text-xs font-black text-white">${day.relativeHumidity}%</span></div>
-                    </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-5 bg-white/5 rounded-3xl"><i data-lucide="droplets" class="w-5 h-5 text-blue-400 mb-2"></i><div class="text-2xl font-black">${day.precipitationProbability}%</div><div class="text-[9px] font-bold text-slate-500 uppercase">Precip Chance (${qpf}")</div></div>
+                    <div class="p-5 bg-white/5 rounded-3xl"><i data-lucide="thermometer" class="w-5 h-5 text-red-400 mb-2"></i><div class="text-2xl font-black">${Math.round(d.maxTemperature.degrees)}° / ${Math.round(d.minTemperature.degrees)}°</div><div class="text-[9px] font-bold text-slate-500 uppercase">Temp Range</div></div>
+                    <div class="p-5 bg-white/5 rounded-3xl"><i data-lucide="sun" class="w-5 h-5 text-yellow-400 mb-2"></i><div class="text-2xl font-black">${day.uvIndex}</div><div class="text-[9px] font-bold text-slate-500 uppercase">UV Exposure</div></div>
+                    <div class="p-5 bg-white/5 rounded-3xl"><i data-lucide="waves" class="w-5 h-5 text-emerald-400 mb-2"></i><div class="text-2xl font-black">${day.relativeHumidity}%</div><div class="text-[9px] font-bold text-slate-500 uppercase">Relative Humidity</div></div>
                 </div>`;
             document.getElementById('detail-modal').classList.replace('hidden', 'flex');
             lucide.createIcons();
         }
 
-        function closeModal() { document.getElementById('detail-modal').classList.replace('flex', 'hidden'); }
-        function formatTime(iso) { return iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : "--:--"; }
-        init();
+        function closeM() { document.getElementById('detail-modal').classList.replace('flex', 'hidden'); }
+        getF();
     </script>
 </body>
 </html>
