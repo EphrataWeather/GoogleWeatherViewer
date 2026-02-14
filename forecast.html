@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>10-Day Forecast | DEEP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background: #020617; color: #f1f5f9; font-family: ui-sans-serif, system-ui; }
+        .forecast-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); transition: 0.2s; }
+        .forecast-card:active { background: rgba(255, 255, 255, 0.08); }
+    </style>
+</head>
+<body class="p-4 lg:p-10 max-w-2xl mx-auto">
+    <header class="mb-8">
+        <h1 class="text-2xl font-black tracking-tight">10-Day Deep Scan</h1>
+        <p class="text-[10px] text-indigo-400 uppercase font-bold tracking-[0.2em]">Predictive Analysis | Akron, PA</p>
+    </header>
+
+    <div id="daily-container" class="space-y-3">
+        <div class="animate-pulse space-y-3">
+            <div class="h-20 bg-white/5 rounded-2xl"></div>
+            <div class="h-20 bg-white/5 rounded-2xl"></div>
+            <div class="h-20 bg-white/5 rounded-2xl"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; // Insert Key
+        const LAT = 40.1579; const LNG = -76.2047;
+
+        async function getForecast() {
+            const url = `https://weather.googleapis.com/v1/forecast/days:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&days=10&key=${API_KEY}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            render(data.forecastDays);
+        }
+
+        function render(days) {
+            const container = document.getElementById('daily-container');
+            container.innerHTML = days.map((d, i) => {
+                const date = new Date(d.interval.startTime);
+                const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+                const desc = d.daytimeForecast.weatherCondition.description.text;
+                const rain = d.daytimeForecast.precipitationProbability || 0;
+
+                return `
+                <div class="forecast-card p-5 rounded-3xl flex items-center justify-between">
+                    <div class="flex items-center gap-5">
+                        <div class="w-12">
+                            <div class="text-xs font-black uppercase ${i === 0 ? 'text-indigo-400' : ''}">${dayName}</div>
+                            <div class="text-[9px] text-slate-500 font-bold">${date.getDate()} ${date.toLocaleString('default', { month: 'short' })}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-indigo-100">${desc}</div>
+                            <div class="text-[9px] font-black text-blue-400 uppercase">${rain}% Rain</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-black text-white">${Math.round(d.maxTemperature.degrees)}°</div>
+                        <div class="text-[10px] font-bold text-slate-600">${Math.round(d.minTemperature.degrees)}°</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        getForecast();
+    </script>
+</body>
+</html>
