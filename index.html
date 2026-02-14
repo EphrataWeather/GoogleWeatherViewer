@@ -112,10 +112,18 @@
         .radar-container {
             position: relative;
             width: 100%;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            /* Mobile: Square (1:1) aspect ratio for better touch area */
+            padding-top: 100%; 
             border-radius: 1.5rem;
             overflow: hidden;
             background: #000;
+        }
+
+        /* Desktop: Standard 16:9 Aspect Ratio */
+        @media (min-width: 1024px) {
+            .radar-container {
+                padding-top: 56.25%; 
+            }
         }
 
         .radar-container iframe {
@@ -279,17 +287,16 @@
         let currentMoonrise = null;
         let currentMoonset = null;
 
-        // Logic for Snow/Sleet Ratios
         const calculateAccumulation = (liquidQpf, type) => {
             const liquid = parseFloat(liquidQpf) || 0;
             const precipType = (type || "").toUpperCase();
             
             if (precipType.includes("SNOW")) {
-                return (liquid * 10).toFixed(2); // 10:1 Snowfall ratio
+                return (liquid * 10).toFixed(2); 
             } else if (precipType.includes("SLEET") || precipType.includes("ICE") || precipType.includes("FREEZING")) {
-                return (liquid * 3).toFixed(2); // 3:1 Sleet ratio
+                return (liquid * 3).toFixed(2); 
             }
-            return liquid.toFixed(2); // 1:1 Rain ratio
+            return liquid.toFixed(2); 
         };
 
         const findValue = (obj, keys, defaultVal = 0) => {
@@ -409,7 +416,6 @@
             const windGust = Math.round(findValue(weather, ['wind.gust.value']));
             const windDeg = findValue(weather, ['wind.direction.degrees'], 0);
 
-            // Responsive Wind HTML: col-span-1 on mobile, 2 on others
             const windHTML = `
                 <div class="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-white/5 border border-indigo-500/20 metric-card flex items-center justify-between">
                     <div class="flex items-center gap-4">
@@ -450,14 +456,12 @@
             document.getElementById('moonrise-time').innerText = formatTime(currentMoonrise);
             document.getElementById('moonset-time').innerText = formatTime(currentMoonset);
 
-            // HOURLY FORECAST
             const hourlyGrid = document.getElementById('hourly-grid');
             hourlyGrid.innerHTML = globalHourly.map((h, i) => {
                 const pProb = findValue(h, ['precipitation.probability.percent', 'precipitationProbability']);
                 const liquidQpf = findValue(h, ['precipitation.qpf.quantity', 'precipitation.amount.value', 'precipitationAmount'], 0);
                 const pType = findValue(h, ['precipitation.probability.type', 'precipitation.type', 'precipitationProbabilityType'], 'RAIN');
                 
-                // Use ratio logic
                 const pAmt = calculateAccumulation(liquidQpf, pType);
                 
                 const temp = Math.round(findValue(h, ['temperature.degrees']));
@@ -480,7 +484,6 @@
                 </div>`;
             }).join('');
 
-            // 10-DAY PROJECTION
             const dailyGrid = document.getElementById('daily-forecast');
             dailyGrid.innerHTML = globalDaily.map((d, i) => {
                 const dateIso = d.interval?.startTime;
@@ -492,7 +495,6 @@
                 const liquidQpf = findValue(dayFcst, ['precipitation.qpf.quantity', 'precipitation.amount.value', 'precipitationAmount'], 0);
                 const pType = findValue(dayFcst, ['precipitation.probability.type', 'precipitation.type', 'precipitationProbabilityType'], 'RAIN');
                 
-                // Use ratio logic
                 const pAmt = calculateAccumulation(liquidQpf, pType);
 
                 const maxT = Math.round(findValue(d, ['maxTemperature.degrees']));
@@ -526,8 +528,8 @@
                 </div>`;
             }).join('');
 
-            // AQI & POLLEN
-            const mainIndex = aqi.indexes?.find(i => i.code === 'uaqi') || aqi.indexes?.[0];
+            // AQI Logic Update: Prioritize 'usa_epa'
+            const mainIndex = aqi.indexes?.find(i => i.code === 'usa_epa') || aqi.indexes?.find(i => i.code === 'uaqi') || aqi.indexes?.[0];
             const badge = document.getElementById('aqi-status-badge');
             badge.innerText = `AQI: ${mainIndex?.aqi || '--'} (${mainIndex?.category || 'N/A'})`;
             badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${getAqiColor(mainIndex?.category)}`;
