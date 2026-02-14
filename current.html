@@ -3,256 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Current Conditions | DEEP</title>
+    <title>Current Environment | DEEP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { background: radial-gradient(circle at top left, #0f172a, #020617); color: #f1f5f9; font-family: ui-sans-serif, system-ui; overflow-x: hidden; }
+        body { background: radial-gradient(circle at top left, #0f172a, #020617); color: #f1f5f9; font-family: ui-sans-serif, system-ui; }
         .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .metric-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04); transition: all 0.2s ease; cursor: pointer; }
-        .metric-card:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(99, 102, 241, 0.4); transform: translateY(-2px); }
-        .glow-text { text-shadow: 0 0 20px rgba(99, 102, 241, 0.4); }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-        .forecast-scroll { display: flex; overflow-x: auto; gap: 0.75rem; padding-bottom: 0.75rem; }
-        .wind-arrow-container { display: flex; align-items: center; justify-content: center; background: rgba(99, 102, 241, 0.15); border: 2px solid rgba(99, 102, 241, 0.3); border-radius: 50%; transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        #detail-modal { backdrop-filter: blur(12px); background: rgba(2, 6, 23, 0.85); }
+        .metric-card { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04); transition: 0.2s; cursor: pointer; }
+        .metric-card:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(99, 102, 241, 0.4); }
+        .wind-arrow { display: inline-flex; align-items: center; justify-content: center; background: rgba(99, 102, 241, 0.2); border-radius: 50%; transition: transform 1s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        #detail-modal { backdrop-filter: blur(16px); background: rgba(2, 6, 23, 0.9); }
+        .custom-scroll::-webkit-scrollbar { height: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
     </style>
 </head>
-<body class="min-h-screen p-4 lg:p-8 flex justify-center">
-    <div class="max-w-6xl w-full glass-panel rounded-[2.5rem] overflow-hidden p-6 lg:p-10 space-y-8">
+<body class="min-h-screen p-4 lg:p-10 flex justify-center">
+    <div class="max-w-5xl w-full glass-panel rounded-[2.5rem] p-6 lg:p-10 space-y-8 overflow-hidden">
         
-        <div class="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-white/5 pb-8">
-            <div class="text-center md:text-left">
-                <h1 id="location-name" class="text-3xl font-black tracking-tight">Akron, PA</h1>
-                <p class="text-[10px] text-indigo-400 uppercase font-bold tracking-[0.2em]">Live Atmospheric Telemetry</p>
+        <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div>
+                <h1 class="text-3xl font-black tracking-tighter">AKRON, PA</h1>
+                <p class="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.3em]">Current Telemetry</p>
             </div>
-            <div class="flex items-center gap-8">
-                <div id="weather-icon-lg"></div>
+            <div class="flex items-center gap-6 bg-white/5 p-4 rounded-3xl border border-white/5">
+                <div id="main-icon"></div>
                 <div class="text-right">
-                    <div id="weather-temp" class="text-6xl font-black glow-text mb-1">--°</div>
-                    <div id="weather-desc" class="text-indigo-300 font-bold uppercase tracking-widest text-[10px]">Syncing...</div>
-                    <div id="weather-feels" class="text-[10px] text-slate-500 mt-1 font-bold italic uppercase">--</div>
+                    <div id="curr-temp" class="text-5xl font-black leading-none tracking-tighter">--°</div>
+                    <div id="curr-desc" class="text-[10px] font-black text-indigo-300 uppercase mt-1 tracking-widest">Loading...</div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
-            <div class="xl:col-span-4 space-y-4">
-                <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Celestial Timing</h2>
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
-                        <i data-lucide="sunrise" class="w-4 h-4 text-orange-400 mx-auto mb-1"></i>
-                        <div id="sunrise-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Sunrise</div>
-                    </div>
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
-                        <i data-lucide="sunset" class="w-4 h-4 text-purple-400 mx-auto mb-1"></i>
-                        <div id="sunset-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Sunset</div>
-                    </div>
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
-                        <i data-lucide="moon" class="w-4 h-4 text-indigo-300 mx-auto mb-1"></i>
-                        <div id="moonrise-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Moonrise</div>
-                    </div>
-                    <div class="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
-                        <i data-lucide="moon-star" class="w-4 h-4 text-slate-400 mx-auto mb-1"></i>
-                        <div id="moonset-time" class="font-bold text-[11px]">--:--</div>
-                        <div class="text-[7px] uppercase text-slate-500 font-bold">Moonset</div>
-                    </div>
-                    <div class="col-span-2 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-center">
-                        <div class="text-[7px] uppercase text-indigo-400 font-bold mb-1">Moon Phase</div>
-                        <div id="moon-phase" class="text-[10px] font-black uppercase">--</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="xl:col-span-8 space-y-4">
-                <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Core Telemetry</h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="weather-details-grid">
-                    </div>
-            </div>
-        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="stat-grid"></div>
 
         <section>
-            <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">24-Hour Micro-Forecast <span class="text-indigo-400 text-[9px] ml-2 tracking-widest">TAP FOR ANALYSIS</span></h2>
-            <div class="forecast-scroll custom-scrollbar" id="hourly-grid"></div>
+            <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <i data-lucide="clock" class="w-3 h-3"></i> 24-Hour Micro-Forecast
+            </h2>
+            <div id="hourly-container" class="flex gap-4 overflow-x-auto pb-4 custom-scroll"></div>
         </section>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <section class="lg:col-span-7 p-6 rounded-[2rem] bg-white/5 border border-white/5">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Chemical Composition (US EPA)</h2>
-                    <div id="aqi-status-badge" class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase">AQI: --</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="p-6 rounded-3xl bg-white/5 border border-white/5">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Air Quality Index</span>
+                    <div id="aqi-val" class="px-3 py-1 rounded-full text-[10px] font-black">--</div>
                 </div>
-                <div id="pollutants-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
-            </section>
-            <section class="lg:col-span-5">
-                <h2 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Plant Allergens</h2>
-                <div id="pollen-types-list" class="space-y-3"></div>
-            </section>
+                <div id="pollutants" class="grid grid-cols-3 gap-2"></div>
+            </div>
+            <div class="p-6 rounded-3xl bg-white/5 border border-white/5">
+                <h2 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Plant Allergens</h2>
+                <div id="pollen-list" class="space-y-3"></div>
+            </div>
         </div>
+
+        <div id="celestial-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
     </div>
 
     <div id="detail-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-6">
-        <div class="max-w-2xl w-full glass-panel rounded-[2rem] p-8 border border-white/20 shadow-2xl relative">
-            <button onclick="closeModal()" class="absolute top-6 right-6 text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+        <div class="max-w-lg w-full glass-panel rounded-[2.5rem] p-8 border border-white/20 relative">
+            <button onclick="closeModal()" class="absolute top-6 right-6 text-slate-400"><i data-lucide="x" class="w-6 h-6"></i></button>
             <div id="modal-content" class="space-y-6"></div>
         </div>
     </div>
 
     <script>
         const API_KEY = "AIzaSyBAjoVkrRrLPzv9MSrlWaWTFELT8KpJ41E"; // Insert Key
-        const LAT = 40.1579; const LNG = -76.2047;
-        let globalHourly = [];
-
-        const calculateAccumulation = (liquidQpf, type) => {
-            const liquid = parseFloat(liquidQpf) || 0;
-            const pType = (type || "").toUpperCase();
-            if (pType.includes("SNOW")) return (liquid * 10).toFixed(2);
-            if (pType.includes("SLEET") || pType.includes("ICE")) return (liquid * 3).toFixed(2);
-            return liquid.toFixed(2);
-        };
-
-        const findValue = (obj, keys, defaultVal = 0) => {
-            for (let key of keys) {
-                const parts = key.split('.');
-                let current = obj;
-                for (let p of parts) { current = (current && typeof current === 'object') ? current[p] : undefined; }
-                if (current !== undefined && current !== null) return current;
-            }
-            return defaultVal;
-        };
+        const LAT = 40.1579, LNG = -76.2047;
+        let hourData = [];
 
         async function init() {
-            try {
-                const endpoints = {
-                    weather: `https://weather.googleapis.com/v1/currentConditions:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&key=${API_KEY}`,
-                    aqi: `https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`,
-                    pollen: `https://pollen.googleapis.com/v1/forecast:lookup?location.latitude=${LAT}&location.longitude=${LNG}&days=1&key=${API_KEY}`,
-                    hourly: `https://weather.googleapis.com/v1/forecast/hours:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&hours=24&key=${API_KEY}`,
-                    daily: `https://weather.googleapis.com/v1/forecast/days:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&days=1&key=${API_KEY}`
-                };
+            const urls = {
+                curr: `https://weather.googleapis.com/v1/currentConditions:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&key=${API_KEY}`,
+                aqi: `https://airquality.googleapis.com/v1/currentConditions:lookup?key=${API_KEY}`,
+                pollen: `https://pollen.googleapis.com/v1/forecast:lookup?location.latitude=${LAT}&location.longitude=${LNG}&days=1&key=${API_KEY}`,
+                hourly: `https://weather.googleapis.com/v1/forecast/hours:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&hours=24&key=${API_KEY}`,
+                daily: `https://weather.googleapis.com/v1/forecast/days:lookup?location.latitude=${LAT}&location.longitude=${LNG}&unitsSystem=IMPERIAL&days=1&key=${API_KEY}`
+            };
 
-                const [wRes, aRes, pRes, hRes, dRes] = await Promise.all([
-                    fetch(endpoints.weather),
-                    fetch(endpoints.aqi, { method: 'POST', body: JSON.stringify({ location: { latitude: LAT, longitude: LNG }}) }),
-                    fetch(endpoints.pollen),
-                    fetch(endpoints.hourly),
-                    fetch(endpoints.daily)
-                ]);
+            const [cR, aR, pR, hR, dR] = await Promise.all([
+                fetch(urls.curr),
+                fetch(urls.aqi, {method:'POST', body:JSON.stringify({location:{latitude:LAT, longitude:LNG}})}),
+                fetch(urls.pollen),
+                fetch(urls.hourly),
+                fetch(urls.daily)
+            ]);
 
-                const weather = await wRes.json();
-                const aqi = await aRes.json();
-                const pollen = await pRes.json();
-                const hourly = await hRes.json();
-                const daily = await dRes.json();
-                globalHourly = hourly.forecastHours || [];
-
-                render(weather, aqi, pollen, hourly, daily.forecastDays[0]);
-            } catch (e) { console.error(e); }
+            render(await cR.json(), await aR.json(), await pR.json(), await hR.json(), (await dR.json()).forecastDays[0]);
         }
 
-        function render(w, a, p, h, d) {
-            const desc = findValue(w, ['weatherCondition.description.text'], "Clear");
-            document.getElementById('weather-temp').innerText = `${Math.round(w.temperature.degrees)}°`;
-            document.getElementById('weather-desc').innerText = desc;
-            document.getElementById('weather-feels').innerText = `Perceived: ${Math.round(w.feelsLikeTemperature.degrees)}°`;
-            
-            const sun = d.sunEvents || {};
-            const moon = d.moonEvents || {};
-            document.getElementById('sunrise-time').innerText = formatTime(sun.sunriseTime);
-            document.getElementById('sunset-time').innerText = formatTime(sun.sunsetTime);
-            document.getElementById('moonrise-time').innerText = formatTime(moon.moonriseTimes?.[0]);
-            document.getElementById('moonset-time').innerText = formatTime(moon.moonsetTimes?.[0]);
-            document.getElementById('moon-phase').innerText = (moon.moonPhase || 'N/A').replace(/_/g, ' ');
+        const getIco = (d) => {
+            const s = d?.toLowerCase() || "";
+            if(s.includes('rain')) return 'cloud-rain';
+            if(s.includes('cloud')) return 'cloud';
+            if(s.includes('sun') || s.includes('clear')) return 'sun';
+            return 'wind';
+        };
 
-            const mb = findValue(w, ['airPressure.meanSeaLevelMillibars'], 0);
-            const inHg = (mb * 0.02953).toFixed(2);
-            const visMiles = (findValue(w, ['visibility.distance']) * 0.621).toFixed(1);
-            const windDeg = findValue(w, ['wind.direction.degrees'], 0);
-            
-            // Core Metrics with Wind Arrow
-            document.getElementById('weather-details-grid').innerHTML = `
-                <div class="col-span-1 sm:col-span-2 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 metric-card flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <div class="wind-arrow-container w-11 h-11" style="transform: rotate(${windDeg}deg)"><i data-lucide="arrow-up" class="w-5 h-5 text-indigo-400"></i></div>
-                        <div><div class="text-[9px] font-black text-slate-500 uppercase">Wind / Gusts</div><div class="text-sm font-bold">${Math.round(w.wind.speed.value)} / ${Math.round(w.wind.gust.value)} mph</div></div>
-                    </div>
+        function render(c, a, p, h, d) {
+            hourData = h.forecastHours;
+            document.getElementById('curr-temp').innerText = `${Math.round(c.temperature.degrees)}°`;
+            document.getElementById('curr-desc').innerText = c.weatherCondition.description.text;
+            document.getElementById('main-icon').innerHTML = `<i data-lucide="${getIco(c.weatherCondition.description.text)}" class="w-10 h-10 text-indigo-400"></i>`;
+
+            // Telemetry
+            const windArrow = `<div class="wind-arrow w-8 h-8" style="transform: rotate(${c.wind.direction.degrees}deg)"><i data-lucide="arrow-up" class="w-4 h-4 text-indigo-400"></i></div>`;
+            document.getElementById('stat-grid').innerHTML = `
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">Wind Dynamics</div>
+                    <div class="flex items-center gap-3">${windArrow}<span class="text-sm font-bold">${Math.round(c.wind.speed.value)} mph</span></div>
                 </div>
-                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
-                    <i data-lucide="droplets" class="w-4 h-4 text-blue-400"></i>
-                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Humidity</div><div class="text-sm font-bold">${w.relativeHumidity}%</div></div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">Pressure</div>
+                    <div class="text-sm font-bold">${(c.airPressure.meanSeaLevelMillibars * 0.02953).toFixed(2)} in</div>
                 </div>
-                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
-                    <i data-lucide="gauge" class="w-4 h-4 text-emerald-400"></i>
-                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Pressure</div><div class="text-sm font-bold">${inHg} in</div></div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">Visibility</div>
+                    <div class="text-sm font-bold">${(c.visibility.distance * 0.621).toFixed(1)} mi</div>
                 </div>
-                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
-                    <i data-lucide="eye" class="w-4 h-4 text-slate-400"></i>
-                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Visibility</div><div class="text-sm font-bold">${visMiles} mi</div></div>
+                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
+                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">Perceived</div>
+                    <div class="text-sm font-bold">${Math.round(c.feelsLikeTemperature.degrees)}°</div>
                 </div>
-                <div class="p-4 rounded-2xl bg-white/5 border border-white/5 metric-card flex items-center gap-3">
-                    <i data-lucide="sun" class="w-4 h-4 text-yellow-400"></i>
-                    <div><div class="text-[9px] font-black text-slate-500 uppercase">UV Index</div><div class="text-sm font-bold">${w.uvIndex}</div></div>
-                </div>`;
+            `;
 
             // Hourly
-            document.getElementById('hourly-grid').innerHTML = globalHourly.map((hour, i) => `
-                <div onclick="showHourlyDetail(${i})" class="min-w-[130px] p-4 rounded-2xl bg-white/5 border border-white/5 text-center metric-card">
-                    <div class="text-[9px] text-slate-500 font-bold mb-2">${formatTime(hour.interval.startTime)}</div>
-                    <div class="text-lg font-black mb-1">${Math.round(hour.temperature.degrees)}°</div>
-                    <div class="text-[8px] text-indigo-400 font-bold uppercase truncate mb-2">${findValue(hour, ['weatherCondition.description.text'])}</div>
-                    <div class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full text-[8px] font-black inline-block">${hour.precipitationProbability || 0}% 💧</div>
-                </div>`).join('');
+            document.getElementById('hourly-container').innerHTML = hourData.map((hr, i) => `
+                <div onclick="showH(${i})" class="min-w-[100px] p-4 rounded-2xl bg-white/5 border border-white/5 text-center metric-card">
+                    <div class="text-[9px] font-bold text-slate-500 mb-2">${new Date(hr.interval.startTime).getHours()}:00</div>
+                    <i data-lucide="${getIco(hr.weatherCondition.description.text)}" class="w-5 h-5 mx-auto mb-2 text-indigo-300"></i>
+                    <div class="text-sm font-black">${Math.round(hr.temperature.degrees)}°</div>
+                    <div class="text-[8px] text-blue-400 font-bold mt-1">${hr.precipitationProbability || 0}% 💧</div>
+                </div>
+            `).join('');
 
             // AQI & Pollen
-            const aqiIdx = a.indexes.find(i => i.code === 'usa_epa') || a.indexes[0];
-            const badge = document.getElementById('aqi-status-badge');
-            badge.innerText = `AQI: ${aqiIdx.aqi} (${aqiIdx.category})`;
-            badge.className = `px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${aqiIdx.category.toLowerCase().includes('good') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'}`;
-            
-            document.getElementById('pollutants-grid').innerHTML = (a.pollutants || []).map(p => `
-                <div class="p-4 rounded-xl bg-black/30 border border-white/5 text-center">
-                    <div class="text-[8px] font-black text-slate-500 uppercase mb-2">${p.displayName}</div>
-                    <div class="font-bold text-xs">${Math.round(p.concentration.value)}</div>
-                </div>`).join('');
+            const usaAqi = a.indexes.find(i => i.code === 'usa_epa') || a.indexes[0];
+            const aqiEl = document.getElementById('aqi-val');
+            aqiEl.innerText = usaAqi.aqi;
+            aqiEl.className += usaAqi.category.toLowerCase().includes('good') ? ' bg-emerald-500/20 text-emerald-400' : ' bg-yellow-500/20 text-yellow-400';
 
-            const pollenData = p.dailyInfo?.[0]?.pollenTypeInfo || [];
-            document.getElementById('pollen-types-list').innerHTML = pollenData.map(t => `
-                <div class="p-4 rounded-2xl bg-white/5 border border-white/5">
-                    <div class="flex justify-between text-[10px] font-black uppercase mb-2"><span>${t.displayName}</span><span class="text-indigo-400">${t.indexInfo.value}/5</span></div>
-                    <div class="w-full bg-white/10 h-1 rounded-full"><div class="bg-indigo-500 h-full" style="width: ${(t.indexInfo.value/5)*100}%"></div></div>
-                </div>`).join('');
+            document.getElementById('pollutants').innerHTML = a.pollutants.slice(0, 3).map(pol => `
+                <div class="text-center p-2 rounded-xl bg-black/20"><div class="text-[7px] font-black text-slate-500 uppercase">${pol.displayName}</div><div class="text-[10px] font-bold">${Math.round(pol.concentration.value)}</div></div>
+            `).join('');
+
+            const pTypes = p.dailyInfo?.[0]?.pollenTypeInfo || [];
+            document.getElementById('pollen-list').innerHTML = pTypes.length > 0 ? pTypes.slice(0, 3).map(pt => `
+                <div class="flex justify-between items-center text-[10px] font-bold uppercase"><span>${pt.displayName}</span><span class="text-indigo-400">${pt.indexInfo.value}/5</span></div>
+            `).join('') : '<div class="text-[10px] font-bold text-slate-600 italic">No Active Pollen Data</div>';
+
+            // Celestial
+            const s = d.sunEvents, m = d.moonEvents;
+            document.getElementById('celestial-grid').innerHTML = `
+                <div class="text-center p-3 rounded-2xl bg-white/5"><i data-lucide="sunrise" class="w-4 h-4 mx-auto mb-1 text-orange-400"></i><div class="text-[10px] font-bold">${new Date(s.sunriseTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>
+                <div class="text-center p-3 rounded-2xl bg-white/5"><i data-lucide="sunset" class="w-4 h-4 mx-auto mb-1 text-purple-400"></i><div class="text-[10px] font-bold">${new Date(s.sunsetTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</div></div>
+                <div class="text-center p-3 rounded-2xl bg-white/5"><i data-lucide="moon" class="w-4 h-4 mx-auto mb-1 text-indigo-300"></i><div class="text-[10px] font-bold">${m.moonriseTimes ? new Date(m.moonriseTimes[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--'}</div></div>
+                <div class="text-center p-3 rounded-2xl bg-white/5"><i data-lucide="moon-star" class="w-4 h-4 mx-auto mb-1 text-slate-400"></i><div class="text-[10px] font-bold">${m.moonsetTimes ? new Date(m.moonsetTimes[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--'}</div></div>
+            `;
 
             lucide.createIcons();
         }
 
-        function showHourlyDetail(index) {
-            const h = globalHourly[index];
-            const pAmt = calculateAccumulation(findValue(h, ['precipitationAmount']), findValue(h, ['precipitationProbabilityType']));
+        function showH(idx) {
+            const h = hourData[idx];
+            const qpf = h.precipitationAmount ? h.precipitationAmount.value.toFixed(2) : "0.00";
             document.getElementById('modal-content').innerHTML = `
-                <h3 class="text-2xl font-black text-white">${formatTime(h.interval.startTime)} Analysis</h3>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    <div><div class="text-[10px] font-black text-slate-500 uppercase">Precipitation</div><div class="text-xl font-bold">${h.precipitationProbability}% (${pAmt}")</div></div>
+                <div class="flex items-center gap-4 border-b border-white/10 pb-4">
+                    <i data-lucide="${getIco(h.weatherCondition.description.text)}" class="w-10 h-10 text-indigo-400"></i>
+                    <div><h3 class="text-2xl font-black">${new Date(h.interval.startTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} Analysis</h3></div>
+                </div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Precipitation</div><div class="text-xl font-bold">${h.precipitationProbability}% (${qpf}")</div></div>
+                    <div><div class="text-[9px] font-black text-slate-500 uppercase">Humidity</div><div class="text-xl font-bold">${h.relativeHumidity}%</div></div>
                     <div class="col-span-2">
-                        <div class="text-[10px] font-black text-slate-500 uppercase mb-2">Wind Dynamics</div>
+                        <div class="text-[9px] font-black text-slate-500 uppercase mb-2">Wind Velocity</div>
                         <div class="flex items-center gap-4">
-                            <div class="wind-arrow-container w-14 h-14" style="transform: rotate(${findValue(h, ['wind.direction.degrees'])}deg)"><i data-lucide="arrow-up" class="w-6 h-6 text-indigo-400"></i></div>
-                            <div><div class="text-xl font-bold">${Math.round(h.wind.speed.value)} mph</div><div class="text-[10px] text-slate-500 font-bold uppercase">Gusts: ${Math.round(h.wind.gust.value)}</div></div>
+                            <div class="wind-arrow w-12 h-12" style="transform: rotate(${h.wind.direction.degrees}deg)"><i data-lucide="arrow-up" class="w-6 h-6 text-indigo-400"></i></div>
+                            <div class="text-xl font-bold">${Math.round(h.wind.speed.value)} mph <span class="text-sm opacity-50">Gust: ${Math.round(h.wind.gust.value)}</span></div>
                         </div>
                     </div>
-                    <div><div class="text-[10px] font-black text-slate-500 uppercase">Feels Like</div><div class="text-xl font-bold">${Math.round(h.feelsLikeTemperature.degrees)}°</div></div>
-                    <div><div class="text-[10px] font-black text-slate-500 uppercase">Humidity</div><div class="text-xl font-bold">${h.relativeHumidity}%</div></div>
-                    <div><div class="text-[10px] font-black text-slate-500 uppercase">UV Index</div><div class="text-xl font-bold">${h.uvIndex}</div></div>
                 </div>`;
             document.getElementById('detail-modal').classList.replace('hidden', 'flex');
             lucide.createIcons();
         }
 
         function closeModal() { document.getElementById('detail-modal').classList.replace('flex', 'hidden'); }
-        function formatTime(iso) { return iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : "--:--"; }
         init();
     </script>
 </body>
